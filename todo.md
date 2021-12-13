@@ -65,10 +65,3 @@
 MotionMatchingDemo问题
 1. bone_angular_velocities的理解以及骨骼速度和角速度计算原理？
 2. range-start range-stop和 framesNum的关系？
-
-
-
-
-1. 绑定姿势如何参与到动画计算中去的？ 
-   绑定姿势主要的需求来源于蒙皮的需要，如果仅仅骨骼移动，不带有任何Mesh,我觉得绑定姿势完全不需要
-2. 假如没有绑定姿势，我有了所有骨骼相对于Root的偏移，可以构造动画数据吗？绑定姿势需要参与吗？
