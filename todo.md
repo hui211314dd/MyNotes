@@ -44,7 +44,7 @@
 . Sample上添加Velocity和TurnSpeed数据
 . 解决滑步问题(IK等)
 . 同步以及其他问题(RootMotion, Motion Wrap)
-. 各个模块文档记录(Trajectory, 添加TrajectoryPoint新成员需要修改哪些内容, Mirror原理, Data Normalize, )  
+. 各个模块文档记录(Trajectory, 添加TrajectoryPoint新成员需要修改哪些内容, Mirror原理, )  
 . MMConfig能否减少被依赖
 . stride scaling
 
@@ -60,8 +60,17 @@
 3. 
 
 
+transition_src_position：在动画空间下当前正在播放的动画源数据中root的位移情况
+transition_src_rotation：在动画空间下当前正在播放的动画源数据中root的旋转情况
+transition_dst_position：在世界空间下root当前的位移情况？
+transition_dst_rotation：在世界空间下root当前的旋转情况？
+
 
 
 MotionMatchingDemo问题
 1. bone_angular_velocities的理解以及骨骼速度和角速度计算原理？
 2. range-start range-stop和 framesNum的关系？
+3. bone_positions 和 db.bone_positions(frame_index) 关系？
+4. transition_src_position,transition_src_rotation,transition_dst_position,transition_dst_rotation以及
+   bone_offset_positions, bone_offset_velocities, bone_offset_rotations, bone_offset_angular_velocities含义以及关系？
+5. inertialize_pose_transition中inertialize_transition为什么传入的都是root_position？
