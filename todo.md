@@ -9,14 +9,19 @@
 9. 各种插值算法，包括Critically Damped Spring，inertialization等
 
 
+学习方法总结：
+1. 当某些代码跟你预想不一样的时候，试着想想那些你以为是这个意思的变量真的是这个意思吗？！试着打印出来是否符合你的预期
+2. 学习就像爬山，当你学习某样知识的时候，如果觉得轻松，其实别人都是一样的，没有什么了不起的，但是，当你感觉到吃力的时候，同样地，大部分人学习的时候也是吃力的，如果你能坚持下来，那你最起码在技术上有了成长
+3. 学习代码的时候，第一步先能运行并且可调试，并且学习计划得有，比如今天看哪个模块或者哪个知识点，否则的话，漫无目的看代码效率会很低
+
 
 明年计划：
 1. maya动画学习，没有什么前置知识，而且学完后可以自己做动画进行其他功能试验。
 2. 动画蓝图的实践，比如ALS这种系统，要经常实践，否则经常处于纸上谈兵的怪圈，无前置知识，需要文档总结, 很多基础系统的学习包括同步组，Pose Driver，AnimationLink等等
-3. 
-4. 国外文档的翻译，接触下最新的理论或者最佳实践等。
-5. 物理动画，需要大量数学的前置知识，所以过看边学，不要先系统去学数学，有需要再去学。
-6. 引擎的具体流程，从动画到drawcall。
+3. 国外文档的翻译，接触下最新的理论或者最佳实践等。
+4. 物理动画，需要大量数学的前置知识，所以过看边学，不要先系统去学数学，有需要再去学。
+5. 引擎的具体流程，从动画到drawcall。
+6. UE5 nes插件 base SimpleNES
 
 
 
@@ -49,22 +54,11 @@
 . stride scaling
 
 
-
-本周计划：
-1. Doom - NPC-Strafe问题
-2. SpringDamper，各种Lerp, FInterpTo 惯性化插值比较以及关卡
-
-每日任务：
-1. Demo工程需要分析看下。
-2. SpringDamper需要掌握。
-3. 
-
-
-transition_src_position：在动画空间下当前正在播放的动画源数据中root的位移情况
-transition_src_rotation：在动画空间下当前正在播放的动画源数据中root的旋转情况
-transition_dst_position：在世界空间下root当前的位移情况？
-transition_dst_rotation：在世界空间下root当前的旋转情况？
-
+近期工作：
+1. Demo中的IK(先自己梳理下流程然后再看代码)和generate_database.py
+2. UE5 PoseSearch工程
+3. Maya学习
+4. 数学关卡
 
 
 MotionMatchingDemo问题
@@ -74,3 +68,9 @@ MotionMatchingDemo问题
 4. transition_src_position,transition_src_rotation,transition_dst_position,transition_dst_rotation以及
    bone_offset_positions, bone_offset_velocities, bone_offset_rotations, bone_offset_angular_velocities含义以及关系？
 5. inertialize_pose_transition中inertialize_transition为什么传入的都是root_position？
+
+MotionTrajectory
+1. EffectiveTimeDomain干啥用的？
+2. SampleRate有什么必要性呢？
+
+重点：学习inertialize时掌握速度，速度offset和位置的关系？
