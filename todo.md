@@ -73,12 +73,28 @@ MotionMatchingDemo问题
 
 MotionTrajectory
 1. EffectiveTimeDomain干啥用的？
-2. SampleRate有什么必要性呢？
 
 重点：学习inertialize时掌握速度，速度offset和位置的关系？
 
+Footlock的问题
+1. 先自己梳理下流程，问题然后再看代码
+
+PoseSearch的问题
+1. PoseSampleTimes怎么回事，不是只需要CurPose就可以吗？
+2. 需要搞明白Character生成的Trajectory与Mesh的转换关系(转90的问题)
+3. Database，Schema,MetaData之间的联系以及参数含义需要搞的明明白白
+4. 如何调试？
+
+PoseMatching
 
 
+Spring的问题
+1. Spring与速度的联系？
+2. 正常图像中的速度如何表示的？
+3. Spring与惯性化插值的特点，区别和应用场景？
+4. 惯性化插值完成时刚好速度，加速度为0吗？
+5. Spring是否速度，加速连续？
+6. 现在的位置为x,速度为v1,目标位置是g,目标速度是v2,SpringDamper和惯性化插值是否都可以使用？
 
 
-
+DeltaTransform.Inverse() * Transform * DeltaTransform;
