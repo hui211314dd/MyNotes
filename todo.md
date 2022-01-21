@@ -76,8 +76,16 @@ MotionTrajectory
 
 重点：学习inertialize时掌握速度，速度offset和位置的关系？
 
+
+
 Footlock的问题
 1. 先自己梳理下流程，问题然后再看代码
+2. 如果没有看代码的话，可能会想到动画里面添加Notify表示左右脚落下抬起，但这个工作量多且繁杂，所以不会优先考虑
+3. 首先面对的问题就是如何判断某个脚落下了或者抬起了？ Trace或者判断骨骼位置？
+4. 如果是后者的话碰到凹凸或者台阶如何处理(仔细想想，Footlock貌似不处理这种问题，Footlock大致原理应该是发现动画脚骨骼落下不动了判定为落下并且锁住，台阶和凹凸问题归Simulation管)
+5. 大致的思路应该是记录左右脚落下的时间点以及位置，然后锁住，直到另外一只脚也落下，这个时间段使用Two Bone IK把脚一直锁住在指定位置
+
+
 
 PoseSearch的问题
 1. PoseSampleTimes怎么回事，不是只需要CurPose就可以吗？
@@ -95,6 +103,9 @@ Spring的问题
 4. 惯性化插值完成时刚好速度，加速度为0吗？
 5. Spring是否速度，加速连续？
 6. 现在的位置为x,速度为v1,目标位置是g,目标速度是v2,SpringDamper和惯性化插值是否都可以使用？
+7. 有了当前位置速度以及目标位置速度信息，使用SpringDamper的数学含义是在曲线中找对应性质的曲线映射过去吗？
+8. spring_damper_implicit使用返回结果值再调用，如何保证速度的连续性以及震荡的稳定性？
+
+DeltaTransform.Inverse() * Transform * DeltaTransform; ？？
 
 
-DeltaTransform.Inverse() * Transform * DeltaTransform;
