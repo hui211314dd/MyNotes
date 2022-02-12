@@ -14,46 +14,6 @@
 2. 学习就像爬山，当你学习某样知识的时候，如果觉得轻松，其实别人都是一样的，没有什么了不起的，但是，当你感觉到吃力的时候，同样地，大部分人学习的时候也是吃力的，如果你能坚持下来，那你最起码在技术上有了成长
 3. 学习代码的时候，第一步先能运行并且可调试，并且学习计划得有，比如今天看哪个模块或者哪个知识点，漫无目的看代码效率会很低
 4. 看代码的主要目的是更加深刻认识原理，作用，使用场景，注意事项等，看了不知道用在哪儿没啥意义
-5. 
-
-
-明年计划：
-1. maya动画学习，没有什么前置知识，而且学完后可以自己做动画进行其他功能试验。
-2. 动画蓝图的实践，比如ALS这种系统，要经常实践，否则经常处于纸上谈兵的怪圈，无前置知识，需要文档总结, 很多基础系统的学习包括同步组，Pose Driver，AnimationLink等等
-3. 国外文档的翻译，接触下最新的理论或者最佳实践等。
-4. 物理动画，需要大量数学的前置知识，所以过看边学，不要先系统去学数学，有需要再去学。
-5. 引擎的具体流程，从动画到drawcall。
-6. UE5 nes插件 base SimpleNES
-
-
-
-
-
-
-
-. Trajectory上添加上Dir和TurnSpeed(完成)
-. 完成Mesh的空间转换以及debug(需要确认下插件目前接收的是哪个空间坐标系的) (完成)
-. 现有的模式下能动起来！(完成)
-. Pose Matching相关(完成)
-. Trajectory相关配置应该继续放在MMConfig中去。(完成)
-. Trajectory数据坐标轴换成统一的(完成)
-
-
-
-
-
-
-. Capsule与Entity的分离以及Adjustment Clamp的实现(重要！)
-. blend data-driven and code-driven(不用做)
-. Debug工具(重要！)
-. 熟悉Cost算法(主要能够多维度控制，Tag，Bias，Group等等)(重要！)
-
-. Sample上添加Velocity和TurnSpeed数据
-. 解决滑步问题(IK等)
-. 同步以及其他问题(RootMotion, Motion Wrap)
-. 各个模块文档记录(Trajectory, 添加TrajectoryPoint新成员需要修改哪些内容, Mirror原理, )  
-. MMConfig能否减少被依赖
-. stride scaling
 
 
 近期工作：
@@ -71,8 +31,6 @@ MotionMatchingDemo问题
    bone_offset_positions, bone_offset_velocities, bone_offset_rotations, bone_offset_angular_velocities含义以及关系？
 5. inertialize_pose_transition中inertialize_transition为什么传入的都是root_position？
 
-MotionTrajectory
-1. EffectiveTimeDomain干啥用的？
 
 重点：学习inertialize时掌握速度，速度offset和位置的关系？
 
@@ -94,18 +52,22 @@ PoseSearch的问题
 4. 如何调试？
 
 PoseMatching
+单个动画已经完成，多个需要Motion Matching配合，目前有bug
 
-
-Spring的问题
-1. Spring与速度的联系？
-2. 正常图像中的速度如何表示的？
-3. Spring与惯性化插值的特点，区别和应用场景？
-4. 惯性化插值完成时刚好速度，加速度为0吗？
-5. Spring是否速度，加速连续？
-6. 现在的位置为x,速度为v1,目标位置是g,目标速度是v2,SpringDamper和惯性化插值是否都可以使用？
-7. 有了当前位置速度以及目标位置速度信息，使用SpringDamper的数学含义是在曲线中找对应性质的曲线映射过去吗？
-8. spring_damper_implicit使用返回结果值再调用，如何保证速度的连续性以及震荡的稳定性？
 
 DeltaTransform.Inverse() * Transform * DeltaTransform; ？？
 
 
+明年计划：
+1. maya动画学习，没有什么前置知识，而且学完后可以自己做动画进行其他功能试验。
+2. 动画蓝图的实践，比如ALS这种系统，要经常实践，否则经常处于纸上谈兵的怪圈，无前置知识，需要文档总结, 很多基础系统的学习包括同步组，Pose Driver，AnimationLink等等
+3. 国外文档的翻译，接触下最新的理论或者最佳实践等。
+4. 物理动画，需要大量数学的前置知识，所以过看边学，不要先系统去学数学，有需要再去学。
+5. 引擎的具体流程，从动画到drawcall。
+6. UE5 nes插件 base SimpleNES
+
+2月目标：
+1. 微积分(2月目标看完)，数值分析等
+2. Maya(2月目标看完)
+3. ALS(2月看完)
+4. PoseSearch(部分看完)
