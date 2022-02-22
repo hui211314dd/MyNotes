@@ -51,22 +51,6 @@ PoseSearch的问题
 3. Database，Schema,MetaData之间的联系以及参数含义需要搞的明明白白
 4. 如何调试？
 
-PoseMatching
-单个动画已经完成，多个需要Motion Matching配合，目前有bug
-MetaData中SamplingRange与AnimState_Block的关系以及Range参数含义等(帧数还是时间？)
-
-
-FPoseSearchExtrapolationParameters
-FPoseSearchFeatureVectorBuilder
-FPoseSearchIndexPreprocessInfo
-UPoseSearchSequenceMetaData
-FPoseSearchPoseMetadata
-FPoseSearchIndexAsset
-UPoseSearchSchema
-FPoseSearchIndex
-FSearchContext
-
-
 
 DeltaTransform.Inverse() * Transform * DeltaTransform; ？？
 
