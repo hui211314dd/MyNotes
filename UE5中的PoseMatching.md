@@ -99,7 +99,7 @@ struct FPoseSearchFeatureVectorBuilder
 ```C++
 // 正如注释里说明的，SequenceStartInterval表示Sequence开头多长时间的动画禁止Transition，这样的话，后面的数据帧会有正确的Past trajectory数据
 // SequenceEndInterval表示末尾多长时间的动画禁止Transition, 这样的话，不仅前面的数据帧会有正确的future trajectory,并且可以避免transition后瞬间结束的现象
-// 这里有个问题是，PoseMatching中其实不需要这两个参数，而且UPoseSearchSequenceMetaData并没有选项设置，导致SequenceEndInterval一直在使用0.2的默认值，如果这时候我设置SampleRange为[0, 0.2]的话其实是无效的，导致没有帧可用了，准备发个Pull Request修改下；Database可以直接设置
+// 这里有个问题是，PoseMatching中其实不需要这两个参数，而且UPoseSearchSequenceMetaData并没有选项设置，导致SequenceEndInterval一直在使用0.2的默认值，如果这时候我设置SampleRange为[0, 0.2]的话其实是无效的，导致没有帧可用了，准备发个Pull Request修改下；DatabaseAsset可以直接设置
 
 //  SequenceStartInterval                      SequenceEndInterval
 //  *********************++++++++++...+++++++++*******************
@@ -108,18 +108,16 @@ struct FPoseSearchBlockTransitionParameters
 {
 	GENERATED_BODY()
 
-	// Excluding the beginning of sequences can help ensure an exact past trajectory is used when building the features
 	UPROPERTY(EditAnywhere, Category = "Settings")
 	float SequenceStartInterval = 0.0f;
 
-	// Excluding the end of sequences help ensure an exact future trajectory, and also prevents the selection of
-	// a sequence which will end too soon to be worth selecting.
 	UPROPERTY(EditAnywhere, Category = "Settings")
 	float SequenceEndInterval = 0.2f;
 };
 ```
 
 ```C++
+// TODO 在FAnimSamplingContext.Init调用后BoneContainer会存储骨骼信息
 struct FAnimSamplingContext
 {
 	// Time delta used for computing pose derivatives
@@ -127,22 +125,14 @@ struct FAnimSamplingContext
 
 	FBoneContainer BoneContainer;
 	
-	// Mirror data table pointer copied from Schema for convenience
+	// TODO 镜像数据使用，以后再补充说明
 	TObjectPtr<UMirrorDataTable> MirrorDataTable = nullptr;
 	
-	// Compact pose format of Mirror Bone Map
+	// TODO 镜像数据使用，以后再补充说明
 	TCustomBoneIndexArray<FCompactPoseBoneIndex, FCompactPoseBoneIndex> CompactPoseMirrorBones;
 	
-	// Pre-calculated component space rotations of reference pose, which allows mirror to work with any joint orientation
-	// Only initialized and used when a mirroring table is specified
+	// TODO 镜像数据使用，以后再补充说明
 	TCustomBoneIndexArray<FQuat, FCompactPoseBoneIndex> ComponentSpaceRefRotations;
-	
-	void Init(const UPoseSearchSchema* Schema);
-	
-	FTransform MirrorTransform(const FTransform& Transform) const;
-
-private:
-	void FillCompactPoseAndComponentRefRotations();
 };
 ```
 
@@ -153,13 +143,113 @@ struct FPoseSearchExtrapolationParameters
 ```
 
 ```C++
+// 经过Init以及Process函数处理后，Input会赋值为传入的Input，Output会设置为相应的值.
 struct FSequenceSampler
-{}
+{
+public:
+	struct FInput
+	{
+		// 传入上述FAnimSamplingContext的指针
+		const FAnimSamplingContext* SamplingContext = nullptr;
+		// UPoseSearchSchema的指针
+		const UPoseSearchSchema* Schema = nullptr;
+		// 动画资源的引用
+		const UAnimSequence* Sequence = nullptr;
+		// 是否为循环动画
+		bool bLoopable = false;
+		// TODO 目前是常量60，注意该值和Schema中的SampleRate是相互独立的,TODO 各个含义？
+		int32 DistanceSamplingRate = 60;
+		// 外推的控制参数
+		FPoseSearchExtrapolationParameters ExtrapolationParameters;
+	} Input;
+
+	struct FOutput
+	{
+		// 每个采样点的累计Root移动距离(注意不是采样点到首个采样点的距离，而是相对于上一个采样点的累计距离)，数值的长度为NumDistanceSamples
+		TArray<float> AccumulatedRootDistance;
+		// 等于 math.ceil(PlayLength * DistanceSamplingRate) + 1
+		int32 NumDistanceSamples = 0;
+		// 动画的长度
+		float PlayLength = 0.0f;
+		// 最终累计移动距离 等于AccumulatedRootDistance.Last()
+		float TotalRootDistance = 0.0f;
+		// 最后一个采样点与首个采样点的相对Transform
+		FTransform TotalRootMotion = FTransform::Identity;
+	} Output;
+
+	void Init(const FInput& Input);
+	void Process();
+
+    // 下面这些函数在 FSequenceIndexer 会被调用
+
+	// Extracts pose from input sequence and mirrors it if necessary
+	void ExtractPose(const FAnimExtractContext& ExtractionCtx, bool bMirrored, FAnimationPoseData& OutAnimPoseData) const;
+
+	// Extracts root transform at the given time, using the extremities of the sequence to extrapolate beyond the 
+	// sequence limits when Time is less than zero or greater than the sequence length.
+	FTransform ExtractRootTransform(float Time) const;
+
+	// Extracts the accumulated root distance at the given time, using the extremities of the sequence to extrapolate 
+	// beyond the sequence limits when Time is less than zero or greater than the sequence length
+	float ExtractRootDistance(float Time) const;
+
+	// Extracts notify states inheriting from UAnimNotifyState_PoseSearchBase present in the sequence at Time.
+	// The function does not empty NotifyStates before adding new notifies!
+	void ExtractPoseSearchNotifyStates(float Time, TArray<class UAnimNotifyState_PoseSearchBase*>& NotifyStates) const;
+
+// private functions
+}
 ```
 
 ```C++
+// 经过Init以及Process函数处理后，Input会赋值为传入的Input，Output会设置为相应的值.
+// 该类是BuildIndex计算过程中最核心的类
 struct FSequenceIndexer
-{}
+{
+public:
+	struct FInput
+	{
+		// 传入FAnimSamplingContext的指针
+		const FAnimSamplingContext* SamplingContext = nullptr;
+		// 传入UPoseSearchSchema指针
+		const UPoseSearchSchema* Schema = nullptr;
+		// 传入主动画的FSequenceSampler指针
+		const FSequenceSampler* MainSequence = nullptr;
+		// TODO Pose Matching中不设置
+		const FSequenceSampler* LeadInSequence = nullptr;
+		// TODO Pose Matching中不设置
+		const FSequenceSampler* FollowUpSequence = nullptr;
+		// TODO 是否镜像，Pose Matching中不设置
+		bool bMirrored = false;
+        // 传入采样的范围，单位为时间而不是帧数,范围clamp在[0, AnimLength]内
+		FFloatInterval RequestedSamplingRange = FFloatInterval(0.0f, 0.0f);
+		// TODO 正如上面说过，Pose Matching时SequenceEndInterval默认值一直是0.2f,如果采样范围小于0.2f的话，会导致采样失败的...这里要特别注意！
+		FPoseSearchBlockTransitionParameters BlockTransitionParameters;
+	} Input;
+
+	struct FOutput
+	{
+		// 根据RequestedSamplingRange提供的采样区间算出首个采样点索引(RequestedSamplingRange.Min * Schema->SampleRate)
+		int32 FirstIndexedSample = 0;
+		// 根据RequestedSamplingRange提供的采样区间算出最后采样点索引(RequestedSamplingRange.Max * Schema->SampleRate)
+		int32 LastIndexedSample = 0;
+		// 采样点的数量(LastIndexedSample - FirstIndexedSample + 1)
+		int32 NumIndexedPoses = 0;
+		// 存储每个采样点的FeatureVector情况, 数组长度等于Schema->Layout.NumFloats * NumIndexedPoses
+		TArray<float> FeatureVectorTable;
+		// 存储每个采样点的PoseMetadata情况，数组长度等于NumIndexedPoses
+		TArray<FPoseSearchPoseMetadata> PoseMetadata;
+	} Output;
+
+	void Init(const FInput& Input);
+	void Process();
+
+private:
+	FPoseSearchFeatureVectorBuilder FeatureVector;
+	FPoseSearchPoseMetadata Metadata;
+
+// private functions
+}
 ```
 
 ```C++
@@ -168,7 +258,9 @@ struct FPoseSearchIndexAsset
 ```
 
 ```C++
-// AnimSequence添加的Meta数据，保存时会调用PreSave，之后会调用BuildIndex，通过传入设置好的Schema,SamplingRange以及ExtrapolationParameters生成SearchIndex数据，供Query使用
+// AnimSequence添加的Meta数据，保存时会调用PreSave，之后会调用BuildIndex，通过传入设置好的Schema,SamplingRange以及ExtrapolationParameters生成SearchIndex数据，供Query使用。
+
+// 所以说UPoseSearchSequenceMetaData最核心的成员其实是SearchIndex
 UCLASS(BlueprintType, Category = "Animation|Pose Search", Experimental)
 class POSESEARCH_API UPoseSearchSequenceMetaData : public UAnimMetaData
 {
@@ -227,7 +319,7 @@ struct FPoseSearchIndex
 ```
 
 ```C++
-// Search函数的唯一参数，需要填充下查询所需的信息
+// UE::PoseSearch::Search函数的唯一参数，需要填充下查询所需的信息
 struct FSearchContext
 {
    // Normalized Query values,具体值为FPoseSearchFeatureVectorBuilder.GetNormalizedValues
