@@ -63,14 +63,18 @@ DeltaTransform.Inverse() * Transform * DeltaTransform; ？？
 5. 引擎的具体流程，从动画到drawcall。
 6. UE5 nes插件 base SimpleNES
 
-2月目标：
-1. ALS(2月部分看完)
-2. PoseSearch(2月部分看完)
-3. 微积分(2月目标看完)
-4. Maya(2月目标看完)
+
+
 
 3月目标:
+PoseSearch看完并且PoseSearch系列完结
+微积分完结
+Maya新手课完结
+
+
+
+
 1. PoseMatching文档(决定看完代码再写，PoseMatching不稳定，bug较多，现在写没有什么意义，看完代码了解完各个参数后效果更佳！)
 2. 数值分析
-3. Footlock以及MotionMatchingDemo分拆文档
+3. Mirror,Footlock以及MotionMatchingDemo分拆文档
 4. ALS以及PoseSearch看完
