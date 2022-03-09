@@ -67,9 +67,25 @@ struct FAnimSamplingContext
 ```
 
 ```C++
+// 当采样到[0, AnimLength]以外的区域时，通过外推参数预测样点信息，算法首先算出[0, SampleTime]时间内的位移信息，有了位移和旋转信息后，通过SampleTime算出平移速度和旋转角速度，如果平移速度大于等于指定的阈值LinearSpeedThreshold则外推时使用该平移速度，否则速度设置为0; 旋转角速度同理，阈值为AngularSpeedThreshold
+USTRUCT()
 struct FPoseSearchExtrapolationParameters
 {
-}
+	GENERATED_BODY()
+
+public:
+	// If the angular root motion speed in degrees is below this value, it will be treated as zero.
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float AngularSpeedThreshold = 1.0f;
+	
+	// If the root motion linear speed is below this value, it will be treated as zero.
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float LinearSpeedThreshold = 1.0f;
+
+	// Time from sequence start/end used to extrapolate the trajectory.
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	float SampleTime = 0.05f;
+};
 ```
 
 ```C++
@@ -218,8 +234,21 @@ private:
 
     // private functions
     // ----------Helper functions--------------------
-    // TODO 
+    /* 获取SampleTime采样点的信息
+	   Input:
+	        SampleTime: 任意正负值
+	   Return:
+	        FSampleInfo::Clip          SampleTime对应的Clip，可能为LeadInSequence，MainSequence或者FollowUpSequence
+			FSampleInfo::RootTransform SampleTime相对于0采样点的Root偏移
+			FSampleInfo::ClipTime      SampleTime对应到Clip的哪个时间点上
+			FSampleInfo::RootDistance  SampleTime相对于0采样点的Distance偏移
+	 */
     FSampleInfo GetSampleInfo(float SampleTime) const;
+
+    /*
+	    获取SampleTime的采样点信息，然后将其中的RootTransform以及RootDistance设置为相对于Origin的位置
+		TODO RootDistance的计算是不是反了？
+	*/
 	FSampleInfo GetSampleInfoRelative(float SampleTime, const FSampleInfo& Origin) const;
 	const float GetSampleTimeFromDistance(float Distance) const;
 	FTransform MirrorTransform(const FTransform& Transform) const;
@@ -229,6 +258,7 @@ private:
   	void SampleBegin(int32 SampleIdx);
 
 	// 根据Schema设置的SampledBones以及PoseSampleTimes信息，算出SampleIdx的对应的f(s-h), f(s)以及f(s+h)的信息，算出位置和速度，最后设置到FeatureVector
+	// 需要注意的是，这个过程中计算出来的位置信息都是相对于当前采样点，同样速度方向也是，这样做是为了将来Feature比较时方便
 	void AddPoseFeatures(int32 SampleIdx);
 
 	// TODO
@@ -285,7 +315,7 @@ struct FPoseSearchIndexAsset
 ```
 
 ```C++
-// AnimSequence添加的Meta数据，保存时会调用PreSave，之后会调用BuildIndex，通过传入设置好的Schema,SamplingRange以及ExtrapolationParameters生成SearchIndex数据，供Query使用。
+// AnimSequence添加的Meta数据，保存时会调用PreSave，之后会调用BuildIndex，根据设置好的Schema,SamplingRange以及ExtrapolationParameters生成SearchIndex数据，供Query使用。
 
 // 所以说UPoseSearchSequenceMetaData最核心的成员其实是SearchIndex
 UCLASS(BlueprintType, Category = "Animation|Pose Search", Experimental)
@@ -313,6 +343,95 @@ public: // UObject
 	virtual void PreSave(FObjectPreSaveContext ObjectSaveContext) override;
    
    // functions end
+};
+```
+
+```C++
+struct FPoseSearchWeightParams
+{}
+```
+
+```C++
+// LIHUI TODO
+void FindValidSequenceIntervals(const FPoseSearchDatabaseSequence& DbSequence, TArray<FFloatRange>& ValidRanges)
+```
+
+```C++
+// 当保存UPoseSearchDatabase资源时会调用PreSave函数，根据设置项生成SearchIndex数据，供Query使用。
+
+// 正如UPoseSearchSequenceMetaData里提到的，UPoseSearchDatabase的核心成员也是SearchIndex
+UCLASS(BlueprintType, Category = "Animation|Pose Search", Experimental)
+class POSESEARCH_API UPoseSearchDatabase : public UDataAsset
+{
+	GENERATED_BODY()
+public:
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Database")
+	const UPoseSearchSchema* Schema;
+
+	UPROPERTY(EditAnywhere, Category = "Database")
+	FPoseSearchWeightParams DefaultWeights;
+
+	// If there's a mirroring mismatch between the currently playing sequence and a search candidate, this cost will be 
+	// added to the candidate, making it less likely to be selected
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Database")
+	float MirroringMismatchCost = 0.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Database")
+	FPoseSearchExtrapolationParameters ExtrapolationParameters;
+
+	UPROPERTY(EditAnywhere, Category = "Database")
+	FPoseSearchBlockTransitionParameters BlockTransitionParameters;
+
+	UPROPERTY(EditAnywhere, Category = "Database")
+	TArray<FPoseSearchDatabaseGroup> Groups;
+
+	// Drag and drop animations here to add them in bulk to Sequences
+	UPROPERTY(EditAnywhere, Category = "Database", DisplayName="Drag And Drop Anims Here")
+	TArray<TObjectPtr<UAnimSequence>> SimpleSequences;
+
+	UPROPERTY(EditAnywhere, Category="Database")
+	TArray<FPoseSearchDatabaseSequence> Sequences;
+
+	UPROPERTY()
+	FPoseSearchIndex SearchIndex;
+
+	int32 FindSequenceForPose(int32 PoseIdx) const;
+	float GetSequenceLength(int32 DbSequenceIdx) const;
+	bool DoesSequenceLoop(int32 DbSequenceIdx) const;
+
+	bool IsValidForIndexing() const;
+	bool IsValidForSearch() const;
+
+	int32 GetPoseIndexFromAssetTime(float AssetTime, const FPoseSearchIndexAsset* SearchIndexAsset) const;
+	float GetTimeOffset(int32 PoseIdx, const FPoseSearchIndexAsset* SearchIndexAsset = nullptr) const;
+	const FPoseSearchDatabaseSequence& GetSourceAsset(const FPoseSearchIndexAsset* SearchIndexAsset) const;
+
+public: // UObject
+    // 会调用BuildIndex(UPoseSearchDatabase* Database)构建SearchIndex数据
+	virtual void PreSave(FObjectPreSaveContext ObjectSaveContext) override;
+
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
+private:
+	void CollectSimpleSequences();
+
+public:
+    // 通过evaluating Sequences Array的数据来填充FPoseSearchIndex::Assets数据
+	/*
+	   细节如下:
+	        遍历Sequences中的每个动画资源（主要是FPoseSearchDatabaseSequence::Sequence,LeadInSequence和FollowUpSequence在此并没有做处理）
+			     1. 判断是需要原始数据还是镜像数据还是两者都要
+				 2. 存储该Sequence存在哪些GroupTags（一个Sequence可能有多个Tag，比如一个Battle_Idle动画可能有BattleTag和IdleTag）存储这些Tag在UPoseSearchDatabase::Groups的索引值，需要注意的是如果Sequence打的Tag没有在Groups中找到，那么会使用默认的Weights，并且在保存时给与警告
+				 3. 到这一步时，我们已经知道了这个Sequence 是否需要镜像数据并且归于哪些Group的信息
+				 4. 调用FindValidSequenceIntervals获取该Sequence的ValidRanges(TODO 调用可以提到外边)
+				 5. 遍历GroupIndices，ValidRanges以及是否镜像，向FPoseSearchIndex::Assets添加项
+
+			没有配置MirrorDataTable的错误处理以及Sequence打的Tag没有在Groups中找到的警告逻辑等
+	*/
+	bool TryInitSearchIndexAssets();
 };
 ```
 
@@ -366,7 +485,7 @@ struct FPoseSearchIndex
 
     // 每个动画资源对应的信息,这些信息供SearchIndex使用
     // 如果是PoseMatching(即UPoseSearchSequenceMetaData)的话，Assets仅有一项
-    // 如果是PoseSearch(即UPoseSearchDatabase)的话，Assets的数量为多个(TODO 多少个呢？)
+    // 如果是PoseSearch(即UPoseSearchDatabase)的话，Assets的数量为多个(可以参考TryInitSearchIndexAssets的注释, 数量大致等于SequencesNum * GroupTags * ValidRangesNum * IsNotMirror)
 	UPROPERTY()
 	TArray<FPoseSearchIndexAsset> Assets;
 }
@@ -405,4 +524,7 @@ private:
 FPoseSearchIndexPreprocessInfo
 UPoseSearchSchema
 
-Mirror原理，Preprocess以及Footlock
+MultiPoseMatching配合AnimState_BlockTransition如何使用？
+Group如何使用？
+Mirror原理，Preprocess，Distance的理解以及应用以及Footlock
+修复MotionMatching Node填入DB后不生效的bug
