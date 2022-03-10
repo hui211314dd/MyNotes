@@ -23,9 +23,7 @@ struct FPoseSearchFeatureVectorBuilder
    // 已经录入的Features数量
 	int32 NumFeaturesAdded = 0;
 }
-```
 
-```C++
 // 正如注释里说明的，SequenceStartInterval表示Sequence开头多长时间的动画禁止Transition，这样的话，后面的数据帧会有正确的Past trajectory数据
 // SequenceEndInterval表示末尾多长时间的动画禁止Transition, 这样的话，不仅前面的数据帧会有正确的future trajectory,并且可以避免transition后瞬间结束的现象
 // 这里有个问题是，PoseMatching中其实不需要这两个参数，而且UPoseSearchSequenceMetaData并没有选项设置，导致SequenceEndInterval一直在使用0.2的默认值，如果这时候我设置SampleRange为[0, 0.2]的话其实是无效的，导致没有帧可用了，准备发个Pull Request修改下；DatabaseAsset可以直接设置
@@ -43,10 +41,8 @@ struct FPoseSearchBlockTransitionParameters
 	UPROPERTY(EditAnywhere, Category = "Settings")
 	float SequenceEndInterval = 0.2f;
 };
-```
 
-```C++
-// TODO 在FAnimSamplingContext.Init调用后BoneContainer会存储骨骼信息
+// 在FAnimSamplingContext.Init调用后BoneContainer会存储骨骼信息，如果配置了MirrorDataTable则初始化其他镜像功能所需的参数
 struct FAnimSamplingContext
 {
 	// 有限差分法使用的Delta值，用于计算SampleTime - FiniteDelta，SampleTime,SampleTime + FiniteDelta，最后再计算速度信息V(s) ~= (f(s+h) - f(s-h))/2h
@@ -55,18 +51,26 @@ struct FAnimSamplingContext
 
 	FBoneContainer BoneContainer;
 	
-	// TODO 镜像数据使用，以后再补充说明
+	// 镜像功能使用，指向Schema中的MirrorDataTable
 	TObjectPtr<UMirrorDataTable> MirrorDataTable = nullptr;
 	
-	// TODO 镜像数据使用，以后再补充说明
+	/* 镜像数据使用，记录了BoneContainer中相关骨骼与镜像骨骼的对应表, 比如foot-l对应的CompactPoseBoneIndex为4，对应的镜像骨骼为foot-r,CompactPoseBoneIndex为7
+	比如存储如下数据:
+	    [0, 0]root->root
+	    [1, 1] pelvis->pelvis
+	    [2, 5]thigh_l->thigh_r
+	    [3, 6]calf_l->calf_r
+	    [4, 7]foot_l->foot_r
+	    [5, 2]thigh_r->thigh_l
+	    [6, 3]calf_r->calf_l
+	    [7, 4]foot_r->foot_l
+	*/
 	TCustomBoneIndexArray<FCompactPoseBoneIndex, FCompactPoseBoneIndex> CompactPoseMirrorBones;
 	
-	// TODO 镜像数据使用，以后再补充说明
+	// 镜像数据使用，记录了CompactPoseBoneIndex对应骨骼在绑定姿势下的组件空间旋转信息
 	TCustomBoneIndexArray<FQuat, FCompactPoseBoneIndex> ComponentSpaceRefRotations;
 };
-```
 
-```C++
 // 当采样到[0, AnimLength]以外的区域时，通过外推参数预测样点信息，算法首先算出[0, SampleTime]时间内的位移信息，有了位移和旋转信息后，通过SampleTime算出平移速度和旋转角速度，如果平移速度大于等于指定的阈值LinearSpeedThreshold则外推时使用该平移速度，否则速度设置为0; 旋转角速度同理，阈值为AngularSpeedThreshold
 USTRUCT()
 struct FPoseSearchExtrapolationParameters
@@ -86,9 +90,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Settings")
 	float SampleTime = 0.05f;
 };
-```
 
-```C++
 // 经过Init以及Process函数处理后，Input会赋值为传入的Input，Output会设置为相应的值.
 struct FSequenceSampler
 {
@@ -124,7 +126,9 @@ public:
 		FTransform TotalRootMotion = FTransform::Identity;
 	} Output;
 
+    // 重置成员变量，设置Output中的PlayLength以及NumDistanceSamples
 	void Init(const FInput& Input);
+	// 调用ProcessRootMotion，该函数主要是遍历动画NumDistanceSamples个采样点，计算累计平移量(AccumulatedRootDistance)，最后计算TotalRootMotion和TotalRootDistance
 	void Process();
 
     // 下面这些函数在 FSequenceIndexer 会被调用
@@ -146,9 +150,7 @@ public:
 
 // private functions
 }
-```
 
-```C++
 struct FSamplingParam
 {
     // 经过Wrap以及Clamp处理后的值，可以是时间或者距离
@@ -161,9 +163,7 @@ struct FSamplingParam
     // 如果不是循环动画的话，经过clamp处理后的余项存储在这里
 	float Extrapolation = 0.0f;
 };
-```
 
-```C++
 // 正如下面注释所提到的，这是个helper函数，用于将time或者distance限定在范围内，返回值FSamplingParam表示出处理后的情况
 // This is a helper function used by both time and distance sampling. A schema may specify time or distance
 // offsets that are multiple cycles of a clip away from the current pose being sampled.
@@ -172,9 +172,7 @@ struct FSamplingParam
 // helps determine how many cycles need to be applied and what the wrapped value should be, clamping
 // if necessary.
 static FSamplingParam WrapOrClampSamplingParam(bool bCanWrap, float SamplingParamExtent, float SamplingParam)
-```
 
-```C++
 // 经过Init以及Process函数处理后，Input会赋值为传入的Input，Output会设置为相应的值.
 // 该类是BuildIndex计算过程中最核心的类
 struct FSequenceIndexer
@@ -274,9 +272,7 @@ private:
 	// ---------Process 执行结束----------------------
     //  ...
 }
-```
 
-```C++
 // 
 
 /**
@@ -312,9 +308,7 @@ struct FPoseSearchIndexAsset
 	UPROPERTY()
 	int32 NumPoses = 0;
 }
-```
 
-```C++
 // AnimSequence添加的Meta数据，保存时会调用PreSave，之后会调用BuildIndex，根据设置好的Schema,SamplingRange以及ExtrapolationParameters生成SearchIndex数据，供Query使用。
 
 // 所以说UPoseSearchSequenceMetaData最核心的成员其实是SearchIndex
@@ -344,19 +338,14 @@ public: // UObject
    
    // functions end
 };
-```
 
-```C++
 struct FPoseSearchWeightParams
 {}
-```
 
-```C++
-// LIHUI TODO
+// 返回DbSequence.Sequence中的有效采样范围，如果动画中有UAnimNotifyState_PoseSearchExcludeFromDatabase，则分成多个Range返回
+// 距离动画SamplingRange设置的是[0, 100],同时UAnimNotifyState_PoseSearchExcludeFromDatabase设置区域为[20, 50],那么返回值为[0, 20)和(50, 100]
 void FindValidSequenceIntervals(const FPoseSearchDatabaseSequence& DbSequence, TArray<FFloatRange>& ValidRanges)
-```
 
-```C++
 // 当保存UPoseSearchDatabase资源时会调用PreSave函数，根据设置项生成SearchIndex数据，供Query使用。
 
 // 正如UPoseSearchSequenceMetaData里提到的，UPoseSearchDatabase的核心成员也是SearchIndex
@@ -433,9 +422,7 @@ public:
 	*/
 	bool TryInitSearchIndexAssets();
 };
-```
 
-```C++
 // AnimSequence中每个采样点都有对应的FPoseSearchPoseMetadata用来影响Query结果，比如Flags如果是BlockTransition的话，说明这个采样点不会被作为结果返回；CostAddend表示这一采样点有额外的Cost(负值表示这个采样点更容易被选中，正值表示这个采样点Cost消耗更大，不那么被人喜欢)
 USTRUCT()
 struct POSESEARCH_API FPoseSearchPoseMetadata
@@ -448,9 +435,7 @@ struct POSESEARCH_API FPoseSearchPoseMetadata
 	UPROPERTY()
 	float CostAddend = 0.0f;
 };
-```
 
-```C++
 // 核心类之一
 struct FPoseSearchIndex
 {
@@ -489,9 +474,7 @@ struct FPoseSearchIndex
 	UPROPERTY()
 	TArray<FPoseSearchIndexAsset> Assets;
 }
-```
 
-```C++
 // UE::PoseSearch::Search函数的唯一参数，需要填充下查询所需的信息
 struct FSearchContext
 {
@@ -519,6 +502,10 @@ private:
    // TODO
 	float MirrorMismatchCost = 0.0f;
 }
+
+bool BuildIndex(const UAnimSequence* Sequence, UPoseSearchSequenceMetaData* SequenceMetaData)
+
+bool BuildIndex(UPoseSearchDatabase* Database)
 ```
 
 FPoseSearchIndexPreprocessInfo
