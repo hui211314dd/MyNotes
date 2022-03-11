@@ -26,7 +26,7 @@ struct FPoseSearchFeatureVectorBuilder
 
 // 正如注释里说明的，SequenceStartInterval表示Sequence开头多长时间的动画禁止Transition，这样的话，后面的数据帧会有正确的Past trajectory数据
 // SequenceEndInterval表示末尾多长时间的动画禁止Transition, 这样的话，不仅前面的数据帧会有正确的future trajectory,并且可以避免transition后瞬间结束的现象
-// 这里有个问题是，PoseMatching中其实不需要这两个参数，而且UPoseSearchSequenceMetaData并没有选项设置，导致SequenceEndInterval一直在使用0.2的默认值，如果这时候我设置SampleRange为[0, 0.2]的话其实是无效的，导致没有帧可用了，准备发个Pull Request修改下；DatabaseAsset可以直接设置
+// 这里有个问题是，PoseMatching(即UPoseSearchSequenceMetaData)中其实不需要这两个参数，而且UPoseSearchSequenceMetaData并没有选项设置，导致SequenceEndInterval一直在使用0.2的默认值，如果这时候我设置SampleRange为[0, 0.2]的话其实是无效的，导致没有帧可用了，准备发个Pull Request修改下；DatabaseAsset可以直接设置
 
 //  SequenceStartInterval                      SequenceEndInterval
 //  *********************++++++++++...+++++++++*******************
@@ -133,6 +133,7 @@ public:
 
     // 下面这些函数在 FSequenceIndexer 会被调用
 
+    // 从动画中提取Pose, 值得注意的是这个函数需要处理Mirrored的情况(另外还有一个函数是MirrorTransform)
 	// Extracts pose from input sequence and mirrors it if necessary
 	void ExtractPose(const FAnimExtractContext& ExtractionCtx, bool bMirrored, FAnimationPoseData& OutAnimPoseData) const;
 
@@ -173,8 +174,53 @@ struct FSamplingParam
 // if necessary.
 static FSamplingParam WrapOrClampSamplingParam(bool bCanWrap, float SamplingParamExtent, float SamplingParam)
 
+// 
+
+/**
+* FPoseSearchIndexAsset具体指代什么呢？因为大部分情况我们不只是只用Origin单个的资源，可能还有它的Mirror版本，资源本身可能还有弃用的片段比如动捕时的TPose情况，所以资源被拆成了多个Ranges, 而且单个资源可能分配到了多个组里面，比如Idle和Battle组，Asset其实是众多组合可能中的一种情况，比如某个Asset可能就是[0, 20]区间Idle组的Mirror信息，一个UPoseSearchDatatable中FPoseSearchIndexAsset数量大致等于SequencesNum * GroupTags * ValidRangesNum * IsNotMirror)
+
+* Information about a source animation asset used by a search index.
+* Some source animation entries may generate multiple FPoseSearchIndexAsset entries.
+**/
+USTRUCT()
+struct FPoseSearchIndexAsset
+{
+    // 单个AnimSequence PoseMatching(即UPoseSearchSequenceMetaData)时不设置
+	// 正常PoseSearch时表示所属组在UPoseSearchDatabase::Groups中的索引值(基于0)
+    UPROPERTY()
+	int32 SourceGroupIdx = INDEX_NONE;
+
+    // 在FPoseSearchIndex::Assets的索引值;
+    // 单个AnimSequence PoseMatching(即UPoseSearchSequenceMetaData)时设置为0; 正常PoseSearch时资源在UPoseSearchDatabase::Sequences的索引值(基于0)
+	// Index of the source asset in search index's container (i.e. UPoseSearchDatabase)
+	UPROPERTY()
+	int32 SourceAssetIdx = INDEX_NONE;
+
+    // 是否镜像数据
+	UPROPERTY()
+	bool bMirrored = false;
+
+    // 有效的采样范围值，单位为时间,例如[0, 2.333f]，用于计算Search后QueryResult的TimeOffsetSeconds
+	UPROPERTY()
+	FFloatInterval SamplingInterval;
+
+    //在FPoseSearchIndex::Values以及FPoseSearchIndex::PoseMetadata的起始Index(需要进行一些换算)
+	UPROPERTY()
+	int32 FirstPoseIdx = INDEX_NONE;
+
+    // 在FPoseSearchIndex::Values以及FPoseSearchIndex::PoseMetadata的Pose的数量
+	UPROPERTY()
+	int32 NumPoses = 0;
+}
+
+
+
+
+
+
 // 经过Init以及Process函数处理后，Input会赋值为传入的Input，Output会设置为相应的值.
 // 该类是BuildIndex计算过程中最核心的类
+// FSequenceIndexer的数量等于FPoseSearchIndexAsset的数量
 struct FSequenceIndexer
 {
 public:
@@ -186,15 +232,15 @@ public:
 		const UPoseSearchSchema* Schema = nullptr;
 		// 传入主动画的FSequenceSampler指针
 		const FSequenceSampler* MainSequence = nullptr;
-		// TODO Pose Matching中不设置
+		// PoseMatching(即UPoseSearchSequenceMetaData)中不设置; 正常PoseSearch时先判断SamplingRange.Min是否为0，如果不为0的话LeadInSequence直接传nullptr即可,否则正常传入设置好的LeadInSequence
 		const FSequenceSampler* LeadInSequence = nullptr;
-		// TODO Pose Matching中不设置
+		// PoseMatching(即UPoseSearchSequenceMetaData)中不设置;正常PoseSearch时先判断SamplingRange.Min是否为AnimLength，如果不等的话LeadInSequence直接传nullptr即可,否则正常传入设置好的FollowUpSequence
 		const FSequenceSampler* FollowUpSequence = nullptr;
-		// TODO 是否镜像，Pose Matching中不设置
+		// 是否镜像数据，PoseMatching(即UPoseSearchSequenceMetaData)中不设置
 		bool bMirrored = false;
         // 传入采样的范围，单位为时间而不是帧数,范围clamp在[0, AnimLength]内
 		FFloatInterval RequestedSamplingRange = FFloatInterval(0.0f, 0.0f);
-		// TODO 正如上面说过，Pose Matching时SequenceEndInterval默认值一直是0.2f,如果采样范围小于0.2f的话，会导致采样失败的...这里要特别注意！
+		// 正如上面说过，PoseMatching(即UPoseSearchSequenceMetaData)时SequenceEndInterval默认值一直是0.2f,如果采样范围小于0.2f的话，会导致采样失败的...这里要特别注意！
 		FPoseSearchBlockTransitionParameters BlockTransitionParameters;
 	} Input;
 
@@ -212,7 +258,9 @@ public:
 		TArray<FPoseSearchPoseMetadata> PoseMetadata;
 	} Output;
 
+    // 重置成员变量，设置Output中的FirstIndexedSample, LastIndexedSample以及NumIndexedPoses
 	void Init(const FInput& Input);
+	// 对于每次采样点依次调用SampleBegin, AddPoseFeatures, AddTrajectoryTimeFeatures, AddTrajectoryDistanceFeatures, AddMetadata和SampleEnd
 	void Process();
 
 private:
@@ -273,44 +321,7 @@ private:
     //  ...
 }
 
-// 
-
-/**
-* Information about a source animation asset used by a search index.
-* Some source animation entries may generate multiple FPoseSearchIndexAsset entries.
-**/
-USTRUCT()
-struct FPoseSearchIndexAsset
-{
-    // PoseMatching时不设置
-    UPROPERTY()
-	int32 SourceGroupIdx = INDEX_NONE;
-
-    // 在FPoseSearchIndex::Assets的索引值;
-    // PoseMatching时设置为0; TODO 正常PoseSearch时资源在UPoseSearchDatabase的索引？
-	// Index of the source asset in search index's container (i.e. UPoseSearchDatabase)
-	UPROPERTY()
-	int32 SourceAssetIdx = INDEX_NONE;
-
-    // 是否镜像数据
-	UPROPERTY()
-	bool bMirrored = false;
-
-    // 有效的采样范围值，单位为时间,例如[0, 2.333f]，用于计算Search后QueryResult的TimeOffsetSeconds
-	UPROPERTY()
-	FFloatInterval SamplingInterval;
-
-    //在FPoseSearchIndex::Values以及FPoseSearchIndex::PoseMetadata的起始Index
-	UPROPERTY()
-	int32 FirstPoseIdx = INDEX_NONE;
-
-    // 在FPoseSearchIndex::Values以及FPoseSearchIndex::PoseMetadata的Pose的数量
-	UPROPERTY()
-	int32 NumPoses = 0;
-}
-
 // AnimSequence添加的Meta数据，保存时会调用PreSave，之后会调用BuildIndex，根据设置好的Schema,SamplingRange以及ExtrapolationParameters生成SearchIndex数据，供Query使用。
-
 // 所以说UPoseSearchSequenceMetaData最核心的成员其实是SearchIndex
 UCLASS(BlueprintType, Category = "Animation|Pose Search", Experimental)
 class POSESEARCH_API UPoseSearchSequenceMetaData : public UAnimMetaData
@@ -339,15 +350,24 @@ public: // UObject
    // functions end
 };
 
+
+
+
+
 struct FPoseSearchWeightParams
 {}
+
+
+
 
 // 返回DbSequence.Sequence中的有效采样范围，如果动画中有UAnimNotifyState_PoseSearchExcludeFromDatabase，则分成多个Range返回
 // 距离动画SamplingRange设置的是[0, 100],同时UAnimNotifyState_PoseSearchExcludeFromDatabase设置区域为[20, 50],那么返回值为[0, 20)和(50, 100]
 void FindValidSequenceIntervals(const FPoseSearchDatabaseSequence& DbSequence, TArray<FFloatRange>& ValidRanges)
 
-// 当保存UPoseSearchDatabase资源时会调用PreSave函数，根据设置项生成SearchIndex数据，供Query使用。
 
+
+
+// 当保存UPoseSearchDatabase资源时会调用PreSave函数，根据设置项生成SearchIndex数据，供Query使用。
 // 正如UPoseSearchSequenceMetaData里提到的，UPoseSearchDatabase的核心成员也是SearchIndex
 UCLASS(BlueprintType, Category = "Animation|Pose Search", Experimental)
 class POSESEARCH_API UPoseSearchDatabase : public UDataAsset
@@ -361,6 +381,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Database")
 	FPoseSearchWeightParams DefaultWeights;
 
+    // 可以参考FSearchContext::MirrorMismatchCost的解释
 	// If there's a mirroring mismatch between the currently playing sequence and a search candidate, this cost will be 
 	// added to the candidate, making it less likely to be selected
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Database")
@@ -480,7 +501,12 @@ struct FSearchContext
 {
    // Normalized Query values,具体值为FPoseSearchFeatureVectorBuilder.GetNormalizedValues
    TArrayView<const float> QueryValues;
-   // TODO
+
+   /* 查询镜像的请求
+       如果请求为Indifferent表示是不是镜像无所谓，这时候候选Pose没有MirrorMismatchCost消耗
+	   如果请求为TrueValue表示希望候选Pose是镜像数据，如果这时候候选Pose不是镜像数据而是源数据，需要增加MirrorMismatchCost额外消耗
+	   如果请求为FalseValue表示希望候选Pose是源数据，如果这时候候选Pose不是源数据而是镜像数据，需要增加MirrorMismatchCost额外消耗
+	*/
 	EPoseSearchBooleanRequest QueryMirrorRequest = EPoseSearchBooleanRequest::Indifferent;
 	// TODO
    const FPoseSearchWeightsContext* WeightsContext = nullptr;
@@ -495,11 +521,16 @@ struct FSearchContext
 private:
    // MotionMatching使用PoseSearchDatabase时有效，引用db数据
 	const UPoseSearchDatabase* SourceDatabase = nullptr;
-   // PoseMatching使用单个AnimSequence时有效，引用动画资源
+
+   // PoseMatching(即UPoseSearchSequenceMetaData)时有效，引用动画资源
 	const UAnimSequenceBase* SourceSequence = nullptr;
+
    // PoseSearchDatabase和UPoseSearchSequenceMetaData内部都维护了FPoseSearchIndex的数据，这里直接拿到引用
 	const FPoseSearchIndex* SearchIndex = nullptr;
-   // TODO
+
+   // 当QueryMirrorRequest请求与候选Pose不匹配时的额外消耗，外部无法设置
+   // PoseMatching(即UPoseSearchSequenceMetaData)时为0
+   // PoseSearch时一般赋值为UPoseSearchDatabase中的MirroringMismatchCost
 	float MirrorMismatchCost = 0.0f;
 }
 
@@ -511,7 +542,13 @@ bool BuildIndex(UPoseSearchDatabase* Database)
 FPoseSearchIndexPreprocessInfo
 UPoseSearchSchema
 
+
+
+
+
 MultiPoseMatching配合AnimState_BlockTransition如何使用？
 Group如何使用？
-Mirror原理，Preprocess，Distance的理解以及应用以及Footlock
+Preprocess，Distance的理解以及应用
+Mirror原理
+Footlock
 修复MotionMatching Node填入DB后不生效的bug
