@@ -1,8 +1,8 @@
-PoseMatching
-单个动画已经完成，多个需要Motion Matching配合，目前有bug
-MetaData中SamplingRange与AnimState_Block的关系以及Range参数含义等(帧数还是时间？)
-
 ```C++
+/**
+ *  PoseSearch
+*/
+
 // 特别重要的类，主要用来处理将features按照feature vector layout格式写入到buffer中，并且会跟踪当前哪些features已经填入了，从而逐步建立feature vector. 还有就是用于在runtime构建search queries
 struct FPoseSearchFeatureVectorBuilder
 {
@@ -106,7 +106,7 @@ public:
 		// 是否为循环动画
 		bool bLoopable = false;
 		// 目前是常量60，注意该值和Schema中的SampleRate是相互独立的
-		// TODO 各个含义？
+		// 区别: DistanceSamplingRate是AccumulatedRootDistance样点的密度，SampleRate是取样的密度，即一个是`种`的密度，一个是`摘`的密度
 		int32 DistanceSamplingRate = 60;
 		// 外推的控制参数
 		FPoseSearchExtrapolationParameters ExtrapolationParameters;
@@ -534,21 +534,48 @@ private:
 	float MirrorMismatchCost = 0.0f;
 }
 
+// 拥有UPoseSearchSequenceMetaData的AnimSequence保存时调用，用于构建UPoseSearchSequenceMetaData的核心成员SearchIndex
 bool BuildIndex(const UAnimSequence* Sequence, UPoseSearchSequenceMetaData* SequenceMetaData)
 
+// UPoseSearchDatabase PreSave时调用，用于构建UPoseSearchDatabase的核心成员SearchIndex
 bool BuildIndex(UPoseSearchDatabase* Database)
+
+//---------------------------------------------------------------------------------------------------------------
+
+
+/**
+ *  AnimNode_MotionMatching
+*/
+
+
+//---------------------------------------------------------------------------------------------------------------
+
+
+/**
+ *  PoseSearchLibrary
+*/
+
+
+//---------------------------------------------------------------------------------------------------------------
 ```
+
+
+
 
 FPoseSearchIndexPreprocessInfo
 UPoseSearchSchema
 
+FDynamicPlayRateSettings
+FMotionMatchingSettings
 
+PoseMatching文档
+单个动画已经完成，多个需要Motion Matching配合，目前有bug
+MetaData中SamplingRange与AnimState_Block的关系以及Range参数含义等(帧数还是时间？)
 
-
-
-MultiPoseMatching配合AnimState_BlockTransition如何使用？
+MultiPoseMatching配合AnimState_BlockTransition如何使用？(如何设置仅仅查询一次，然后顺序播放即可)
 Group如何使用？
 Preprocess，Distance的理解以及应用
-Mirror原理
+
+Mirror原理(重点并且细致的剖析)，资料有MMDemo, ControlRig/Maya生成Mirror逻辑，PoseSearch等, MirrorTransform？, LU停步动画Mirrored后有位移，bug？
 Footlock
 修复MotionMatching Node填入DB后不生效的bug
