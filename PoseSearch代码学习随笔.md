@@ -534,12 +534,34 @@ private:
 	float MirrorMismatchCost = 0.0f;
 }
 
+// TODO
+struct FPoseCost
+{
+	float Dissimilarity = MAX_flt;
+	float CostAddend = 0.0f;
+	float TotalCost = MAX_flt;
+	bool operator<(const FPoseCost& Other) const { return TotalCost < Other.TotalCost; }
+};
+
+// TODO
+struct FSearchResult
+{
+	FPoseCost PoseCost;
+	int32 PoseIdx = INDEX_NONE;
+	const FPoseSearchIndexAsset* SearchIndexAsset = nullptr;
+	float TimeOffsetSeconds = 0.0f;
+
+	bool IsValid() const { return PoseIdx >= 0; }
+}
+
 // 拥有UPoseSearchSequenceMetaData的AnimSequence保存时调用，用于构建UPoseSearchSequenceMetaData的核心成员SearchIndex
 bool BuildIndex(const UAnimSequence* Sequence, UPoseSearchSequenceMetaData* SequenceMetaData)
 
 // UPoseSearchDatabase PreSave时调用，用于构建UPoseSearchDatabase的核心成员SearchIndex
 bool BuildIndex(UPoseSearchDatabase* Database)
 
+// PoseSearch核心函数，SearchContext为查询所需的参数，FSearchResult结果返回最接近查询要求的Pose信息
+FSearchResult Search(FSearchContext& SearchContext)
 //---------------------------------------------------------------------------------------------------------------
 
 
@@ -555,7 +577,109 @@ bool BuildIndex(UPoseSearchDatabase* Database)
  *  PoseSearchLibrary
 */
 
+// 
+struct FMotionMatchingPoseStepper
+{
+	FSearchResult Result;
+	bool bJumpRequired = false;
 
+	bool CanContinue() const
+	{
+		return Result.IsValid();
+	}
+
+	void Reset()
+	{
+		Result = UE::PoseSearch::FSearchResult();
+		bJumpRequired = false;
+	}
+
+    // TODO LIHUI Result.TimeOffsetSeconds = State.AssetPlayerTime是否赋值错误？
+	void Update(const FAnimationUpdateContext& UpdateContext, const struct FMotionMatchingState& State);
+};
+
+// 
+USTRUCT(BlueprintType, Category = "Animation|Pose Search")
+struct POSESEARCH_API FMotionMatchingSettings
+{
+	GENERATED_BODY()
+
+	// Dynamic weights for influencing pose selection
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(PinHiddenByDefault))
+	FPoseSearchDynamicWeightParams Weights;
+
+    // 当需要blend out到某个新姿势时，这里控制的是融合的时间，因为使用的是惯性化插值所以MotionMatching Node后面需要跟上一个Inertialization Node
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(ClampMin="0"))
+	float BlendTime = 0.2f;
+
+    // 如果说当前播放的Pose与Search后TargetPose在Mirror属性上不一致，并且MirrorChangeBlendTime大于0，那么不再使用上面的BlendTime而是使用MirrorChangeBlendTime
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (ClampMin = "0", DislayAfter = "BlendTime"))
+	float MirrorChangeBlendTime = 0.0f;
+	
+	// Don't jump to poses that are less than this many seconds away
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(ClampMin="0"))
+	float PoseJumpThresholdTime = 1.f;
+
+	// Minimum amount of time to wait between pose search queries
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(ClampMin="0"))
+	float SearchThrottleTime = 0.1f;
+
+	// How much better the search result must be compared to the current pose in order to jump to it
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(ClampMin="0", ClampMax="100"))
+	float MinPercentImprovement = 40.0f;
+};
+
+// 
+USTRUCT(BlueprintType, Category="Animation|Pose Search")
+struct POSESEARCH_API FMotionMatchingState
+{
+	GENERATED_BODY()
+
+	// Initializes the minimum required motion matching state
+	bool InitNewDatabaseSearch(const UPoseSearchDatabase* Database, float SearchThrottleTime, FText* OutError);
+
+	// Adds trajectory prediction and history information to ComposedQuery
+	void ComposeQuery(const UPoseSearchDatabase* Database, const FTrajectorySampleRange& Trajectory);
+
+	// Internally stores the 'jump' to a new pose/sequence index and asset time for evaluation
+	void JumpToPose(const FAnimationUpdateContext& Context, const FMotionMatchingSettings& Settings, const UE::PoseSearch::FSearchResult& Result);
+
+	const FPoseSearchIndexAsset* GetCurrentSearchIndexAsset() const;
+
+	float ComputeJumpBlendTime(const UE::PoseSearch::FSearchResult& Result, const FMotionMatchingSettings& Settings) const;
+
+	// The current pose we're playing from the database
+	UPROPERTY(Transient)
+	int32 DbPoseIdx = INDEX_NONE;
+
+	// The current animation we're playing from the database
+	UPROPERTY(Transient)
+	int32 SearchIndexAssetIdx = INDEX_NONE;
+
+	// The current query feature vector used to search the database for pose candidates
+	UPROPERTY(Transient)
+	FPoseSearchFeatureVectorBuilder ComposedQuery;
+
+	// Precomputed runtime weights
+	UPROPERTY(Transient)
+	FPoseSearchWeightsContext WeightsContext;
+
+	// When the database changes, the search parameters are reset
+	UPROPERTY(Transient)
+	TWeakObjectPtr<const UPoseSearchDatabase> CurrentDatabase = nullptr;
+
+	// Time since the last pose jump
+	UPROPERTY(Transient)
+	float ElapsedPoseJumpTime = 0.f;
+
+	// Current time within the asset player node
+	UPROPERTY(Transient)
+	float AssetPlayerTime = 0.f;
+
+	// Evaluation flags relevant to the state of motion matching
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=State)
+	EMotionMatchingFlags Flags = EMotionMatchingFlags::None;
+};
 //---------------------------------------------------------------------------------------------------------------
 ```
 
