@@ -683,7 +683,7 @@ struct POSESEARCH_API FMotionMatchingState
 	UPROPERTY(Transient)
 	float ElapsedPoseJumpTime = 0.f;
 
-	// Current time within the asset player node
+    // 当前AssetPlayerNode上播放的时间点(当前播放的动画帧是某个动画的具体时间点)
 	UPROPERTY(Transient)
 	float AssetPlayerTime = 0.f;
 
