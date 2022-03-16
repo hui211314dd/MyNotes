@@ -190,9 +190,8 @@ struct FPoseSearchIndexAsset
     UPROPERTY()
 	int32 SourceGroupIdx = INDEX_NONE;
 
-    // 在FPoseSearchIndex::Assets的索引值;
-    // 单个AnimSequence PoseMatching(即UPoseSearchSequenceMetaData)时设置为0; 正常PoseSearch时资源在UPoseSearchDatabase::Sequences的索引值(基于0)
-	// Index of the source asset in search index's container (i.e. UPoseSearchDatabase)
+    // 单个AnimSequence PoseMatching(即UPoseSearchSequenceMetaData)时设置为0
+	// 正常PoseSearch时资源在UPoseSearchDatabase::Sequences的索引值(基于0)
 	UPROPERTY()
 	int32 SourceAssetIdx = INDEX_NONE;
 
@@ -534,21 +533,29 @@ private:
 	float MirrorMismatchCost = 0.0f;
 }
 
-// TODO
+// Pose Cost详细信息
 struct FPoseCost
-{
+{   
+	// Feature 差异性计算的cost
 	float Dissimilarity = MAX_flt;
+	// Cost额外项目，比如MirrorMismatchCost或者UAnimNotifyState_PoseSearchModifyCost引起的
 	float CostAddend = 0.0f;
+	// Dissimilarity + CostAddend
 	float TotalCost = MAX_flt;
 	bool operator<(const FPoseCost& Other) const { return TotalCost < Other.TotalCost; }
 };
 
-// TODO
+// 查询的结果
 struct FSearchResult
 {
+	// 当前结果所需的Cost
 	FPoseCost PoseCost;
+	// 结果的Pose Index，可在FPoseSearchIndex::PoseMetadata查看Pose详细
 	int32 PoseIdx = INDEX_NONE;
+	// 该Pose所属的FPoseSearchIndexAsset
 	const FPoseSearchIndexAsset* SearchIndexAsset = nullptr;
+	// 该Pose所在动画的时间索引
+	// (TODO 该属性目前来看是冗余的，因为SearchIndex->GetTimeOffset(PoseIdx, SearchIndexAsset)可以计算出来此值)
 	float TimeOffsetSeconds = 0.0f;
 
 	bool IsValid() const { return PoseIdx >= 0; }
@@ -577,10 +584,12 @@ FSearchResult Search(FSearchContext& SearchContext)
  *  PoseSearchLibrary
 */
 
-// 
+// Pose步进器
 struct FMotionMatchingPoseStepper
 {
+	// Update后的结果存于此
 	FSearchResult Result;
+	// Update后发现目前的动画已经Finish需要跳转到FollowUp动画中去，如果需要跳转，bJumpRequired设置为true
 	bool bJumpRequired = false;
 
 	bool CanContinue() const
@@ -594,7 +603,8 @@ struct FMotionMatchingPoseStepper
 		bJumpRequired = false;
 	}
 
-    // TODO LIHUI Result.TimeOffsetSeconds = State.AssetPlayerTime是否赋值错误？
+    // 尝试在State当前的动画上尝试向后步进一个DeltaTime, 如果可以的话，设置好Result并返回；如果动画已经Finish了，那么会尝试从Database中的Sequences中找到Entry.Sequence等于当前动画FollowUpSequence的(这一步非常重要，说明了LeadInSequence以及FollowUpSequence的意义，可以多个动画拼接组成Sequences), 如果有再看下该动画的Mirror属性是否相匹配(Sequence如果是镜像动画在播放，当前FollowUp的动画也应该镜像播放)，最后再测试下该动画的第0帧是否在采样区间中,如果都满足了，则跳转到该Asset上并且bJumpRequired设置为true
+    // TODO LIHUI Result.TimeOffsetSeconds = State.AssetPlayerTime 是否赋值错误？
 	void Update(const FAnimationUpdateContext& UpdateContext, const struct FMotionMatchingState& State);
 };
 
@@ -641,6 +651,7 @@ struct POSESEARCH_API FMotionMatchingState
 	// Adds trajectory prediction and history information to ComposedQuery
 	void ComposeQuery(const UPoseSearchDatabase* Database, const FTrajectorySampleRange& Trajectory);
 
+    // TODO LIHUI
 	// Internally stores the 'jump' to a new pose/sequence index and asset time for evaluation
 	void JumpToPose(const FAnimationUpdateContext& Context, const FMotionMatchingSettings& Settings, const UE::PoseSearch::FSearchResult& Result);
 
