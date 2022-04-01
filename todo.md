@@ -78,9 +78,4 @@ Maya新手课完结
 2. 数值分析
 3. Mirror,Footlock以及MotionMatchingDemo分拆文档
 4. ALS以及PoseSearch看完
-
-
-
-1. UI角色的旋转逻辑
-2. 跳转先跑通
-3. 界面细节
+5. 剖析RootMotion以及AnimNode各个函数含义

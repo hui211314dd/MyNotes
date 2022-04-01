@@ -357,6 +357,28 @@ struct FPoseSearchWeightParams
 {}
 
 
+struct FPoseSearchWeightsContext
+{
+public:
+	// Check if the database or runtime weight parameters have changed and then computes and caches new group weights
+	void Update(const FPoseSearchDynamicWeightParams& DynamicWeights, const UPoseSearchDatabase * Database);
+
+	const FPoseSearchWeights* GetGroupWeights (int32 WeightsGroupIdx) const;
+	
+private:
+	UPROPERTY(Transient)
+	TWeakObjectPtr<const UPoseSearchDatabase> Database = nullptr;
+
+	UPROPERTY(Transient)
+	FPoseSearchDynamicWeightParams DynamicWeights;
+
+	UPROPERTY(Transient)
+	FPoseSearchWeights ComputedDefaultGroupWeights;
+
+	UPROPERTY(Transient)
+	TArray<FPoseSearchWeights> ComputedGroupWeights;
+};
+
 
 
 // 返回DbSequence.Sequence中的有效采样范围，如果动画中有UAnimNotifyState_PoseSearchExcludeFromDatabase，则分成多个Range返回
@@ -603,8 +625,7 @@ struct FMotionMatchingPoseStepper
 		bJumpRequired = false;
 	}
 
-    // 尝试在State当前的动画上尝试向后步进一个DeltaTime, 如果可以的话，设置好Result并返回；如果动画已经Finish了，那么会尝试从Database中的Sequences中找到Entry.Sequence等于当前动画FollowUpSequence的(这一步非常重要，说明了LeadInSequence以及FollowUpSequence的意义，可以多个动画拼接组成Sequences), 如果有再看下该动画的Mirror属性是否相匹配(Sequence如果是镜像动画在播放，当前FollowUp的动画也应该镜像播放)，最后再测试下该动画的第0帧是否在采样区间中,如果都满足了，则跳转到该Asset上并且bJumpRequired设置为true
-    // TODO LIHUI Result.TimeOffsetSeconds = State.AssetPlayerTime 是否赋值错误？
+    // 尝试在State当前的动画上尝试向后步进一个DeltaTime, 如果步进后的时间仍然在有效范围的话，设置好Result(特别注意的是，Result是步进前那个时间点的状态信息而非步进后的)并返回；如果动画已经Finish了，那么会尝试从Database中的Sequences中找到Entry.Sequence等于当前动画FollowUpSequence的(这一步非常重要，说明了LeadInSequence以及FollowUpSequence的意义，可以多个动画拼接组成Sequences), 如果有再看下该动画的Mirror属性是否相匹配(Sequence如果是镜像动画在播放，当前FollowUp的动画也应该镜像播放)，最后再测试下该动画的第0帧是否在采样区间中,如果都满足了，则跳转到该Asset上并且bJumpRequired设置为true(特别注意的是，这里设置的Result是FollowUp的动画也就是说使用的是步进后的状态信息，是因为动画的播放是交给SequencePlayer的，如果这时候仍然使用步进前的状态信息,SequencePlayer在播放DeltaTime后的动画时会采样失败，并且bJumpRequired为true会触发Inertialization,所以表现上也会平滑一些)
 	void Update(const FAnimationUpdateContext& UpdateContext, const struct FMotionMatchingState& State);
 };
 
@@ -626,15 +647,15 @@ struct POSESEARCH_API FMotionMatchingSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (ClampMin = "0", DislayAfter = "BlendTime"))
 	float MirrorChangeBlendTime = 0.0f;
 	
-	// Don't jump to poses that are less than this many seconds away
+	// Search返回的最佳候选帧ResultPose与当前帧CurPose如果同属一个FPoseSearchIndexAsset并且两帧之间的时间差小于PoseJumpThresholdTime阈值，说明候选帧就在附近，不可以Jump
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(ClampMin="0"))
 	float PoseJumpThresholdTime = 1.f;
 
-	// Minimum amount of time to wait between pose search queries
+	// 两次查询的最小间隔时间，一方面可以避免每帧都Search, 从动画效果以及性能上都有提升，另外，当应用MultiPoseMatching时，可以将这个值设置为一个很大的值，保证就Search一次
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(ClampMin="0"))
 	float SearchThrottleTime = 0.1f;
 
-	// How much better the search result must be compared to the current pose in order to jump to it
+    // 我们发现Search返回的最佳候选帧ResultPose与当前帧CurPose相比而言，候选帧的TotalCost和Dissimilarity都要小，MinPercentImprovement这个参数表示当(CurPose.Dissimilarity - ResultPose.Dissimilarity)/CurPose.Dissimilarity 大于这个MinPercentImprovement百分比时(默认值40表示 40% )，我们才会认为有了显著的提升，进而才会考虑Jump
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(ClampMin="0", ClampMax="100"))
 	float MinPercentImprovement = 40.0f;
 };
@@ -645,14 +666,14 @@ struct POSESEARCH_API FMotionMatchingState
 {
 	GENERATED_BODY()
 
-	// Initializes the minimum required motion matching state
+	// 通过Database初始化内部的变量，传入SearchThrottleTime是为了设置内部的ElapsedPoseJumpTime，这样下一次保证肯定会触发Search
 	bool InitNewDatabaseSearch(const UPoseSearchDatabase* Database, float SearchThrottleTime, FText* OutError);
 
 	// Adds trajectory prediction and history information to ComposedQuery
 	void ComposeQuery(const UPoseSearchDatabase* Database, const FTrajectorySampleRange& Trajectory);
 
-    // TODO LIHUI
-	// Internally stores the 'jump' to a new pose/sequence index and asset time for evaluation
+	// Jump到Result指定的Pose上，内部记录好DbPoseIdx以及SearchIndexAssetIdx，以及AssetPlayerTime(对于evaluation来说特别重要的参数), 因为本次要完成跳转，所以ElapsedPoseJumpTime需要置零, 最后发出InertialBlend的请求
+	// 可以注意到，JumpToPose的Result参数刚好是Search函数以及PoseStepper的返回值，所以可以直接Jump
 	void JumpToPose(const FAnimationUpdateContext& Context, const FMotionMatchingSettings& Settings, const UE::PoseSearch::FSearchResult& Result);
 
 	const FPoseSearchIndexAsset* GetCurrentSearchIndexAsset() const;
@@ -663,7 +684,7 @@ struct POSESEARCH_API FMotionMatchingState
 	UPROPERTY(Transient)
 	int32 DbPoseIdx = INDEX_NONE;
 
-	// The current animation we're playing from the database
+	// 当前正在播放的动画资源在Database中的索引,比如Database->SearchIndex.Assets[SearchIndexAssetIdx]
 	UPROPERTY(Transient)
 	int32 SearchIndexAssetIdx = INDEX_NONE;
 
@@ -679,7 +700,7 @@ struct POSESEARCH_API FMotionMatchingState
 	UPROPERTY(Transient)
 	TWeakObjectPtr<const UPoseSearchDatabase> CurrentDatabase = nullptr;
 
-	// Time since the last pose jump
+	// 自从上次Pose Jump已经过去的时间, 这个值在Update过程中会累加，当超过Setting.SearchThrottleTime才会执行Search，而并非每一帧都Search
 	UPROPERTY(Transient)
 	float ElapsedPoseJumpTime = 0.f;
 
@@ -691,6 +712,172 @@ struct POSESEARCH_API FMotionMatchingState
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=State)
 	EMotionMatchingFlags Flags = EMotionMatchingFlags::None;
 };
+
+// UpdateMotionMatchingState是整个PoseSearch最为核心的函数，MotionMatching的核心算法就在这里，所以我们把函数实现拷贝下来，仔细分析下
+void UpdateMotionMatchingState(
+	const FAnimationUpdateContext& Context,
+	const UPoseSearchDatabase* Database,
+	const FGameplayTagQuery* DatabaseTagQuery,
+	const FTrajectorySampleRange& Trajectory,
+	const FMotionMatchingSettings& Settings,
+	FMotionMatchingState& InOutMotionMatchingState
+)
+{
+	using namespace UE::PoseSearch;
+    
+	// TODO 有意思的是，这里竟然也出现了一个bug。。。Database在AnimGraphNode_MotionMatching里面赋值的时候会出现nullptr的情况，日后再查
+	if (!Database)
+	{
+		Context.LogMessage(EMessageSeverity::Error, LOCTEXT("NoDatabase", "No database provided for motion matching."));
+		return;
+	}
+
+    // 运行时发现Database发生了改变，需要重新初始化State
+	InOutMotionMatchingState.Flags = EMotionMatchingFlags::None;
+	if (InOutMotionMatchingState.CurrentDatabase != Database)
+	{
+		FText InitError;
+		if (!InOutMotionMatchingState.InitNewDatabaseSearch(Database, Settings.SearchThrottleTime, &InitError))
+		{
+			Context.LogMessage(EMessageSeverity::Error, InitError);
+			return;
+		}
+	}
+
+	const float DeltaTime = Context.GetDeltaTime();
+
+	// 使用PoseStepper尝试看下DeltaTime后即NextFrame是否存在有效的采样动画，内部会判断是否需要Jump
+	FMotionMatchingPoseStepper PoseStepper;
+	PoseStepper.Update(Context, InOutMotionMatchingState);
+	if (PoseStepper.CanContinue())
+	{
+		// 注意，这里返回的Result仍然是步进前的状态
+		InOutMotionMatchingState.DbPoseIdx = PoseStepper.Result.PoseIdx;
+		InOutMotionMatchingState.SearchIndexAssetIdx = 
+			InOutMotionMatchingState.CurrentDatabase->SearchIndex.FindAssetIndex(PoseStepper.Result.SearchIndexAsset);
+	}
+
+	// 构建查询所需的VectorBuilder
+	if (InOutMotionMatchingState.DbPoseIdx != INDEX_NONE)
+	{
+		// 直接Copy DbPoseIdx存储的Pose信息
+		InOutMotionMatchingState.ComposedQuery.CopyFromSearchIndex(Database->SearchIndex, InOutMotionMatchingState.DbPoseIdx);
+	}
+	else
+	{
+		// 首次调用或者Database运行时改变的时候，从PoseHistoryProvider读取历史值
+		IPoseHistoryProvider* PoseHistoryProvider = Context.GetMessage<IPoseHistoryProvider>();
+		if (PoseHistoryProvider)
+		{
+			FPoseHistory& History = PoseHistoryProvider->GetPoseHistory();
+			InOutMotionMatchingState.ComposedQuery.TrySetPoseFeatures(
+				&History, 
+				Context.AnimInstanceProxy->GetRequiredBones());
+		}
+	}
+
+	// 与Trajectory组合
+	InOutMotionMatchingState.ComposeQuery(Database, Trajectory);
+
+    // 构建查询所需的FSearchContext，需要注意的是QueryMirrorRequest，默认方案是QueryMirrorRequest请求当前播放动画资源的Mirrored情况，即当前播放的是Mirrored资源，那么请求的时候也希望是Mirrored资源，否则的话会有MirrorMisMatchCost
+	FSearchContext SearchContext;
+	SearchContext.SetSource(InOutMotionMatchingState.CurrentDatabase.Get());
+	SearchContext.QueryValues = InOutMotionMatchingState.ComposedQuery.GetNormalizedValues();
+	SearchContext.WeightsContext = &InOutMotionMatchingState.WeightsContext;
+	SearchContext.DatabaseTagQuery = DatabaseTagQuery;
+	if (const FPoseSearchIndexAsset* CurrentIndexAsset = InOutMotionMatchingState.GetCurrentSearchIndexAsset())
+	{
+		SearchContext.QueryMirrorRequest =
+			CurrentIndexAsset->bMirrored ?
+			EPoseSearchBooleanRequest::TrueValue :
+			EPoseSearchBooleanRequest::FalseValue;
+	}
+
+	// TODO 动态更新Weight情况
+	InOutMotionMatchingState.WeightsContext.Update(Settings.Weights, Database);
+
+	// 说明NextFrame找不到且不存在有效的FollowUp动画，这时候强制触发Search（因为这里的缘故，通过给SearchThrottleTime设置很大的值完成MultiPoseMatching的方案是行不通的，因为当动画快结束时会再一次触发Search）
+	if (!PoseStepper.CanContinue())
+	{
+		FSearchResult Result = Search(SearchContext);
+		InOutMotionMatchingState.JumpToPose(Context, Settings, Result);
+	}
+
+	// ElapsedPoseJumpTime累计时间超过了阈值SearchThrottleTime，需要再一次Search
+	else if ((InOutMotionMatchingState.ElapsedPoseJumpTime >= Settings.SearchThrottleTime))
+	{
+		// 首先通过比较当前的Pose与SearchContext中的FeatureVector计算出CurrentPoseCost作为参考值
+		FPoseCost CurrentPoseCost;
+		if (InOutMotionMatchingState.DbPoseIdx != INDEX_NONE)
+		{
+			const FPoseSearchIndexAsset* SearchIndexAsset = &Database->SearchIndex.Assets[InOutMotionMatchingState.SearchIndexAssetIdx];
+			CurrentPoseCost = ComparePoses(InOutMotionMatchingState.DbPoseIdx, SearchContext, SearchIndexAsset->SourceGroupIdx);
+		}
+
+		// Search查找最匹配的Frame
+		FSearchResult Result = Search(SearchContext);
+
+		// 需要比较下Result与CurrentPose,只有当Result比CurrentPose更相似并且不在附近区域的时候，我们才能认定可以进行跳转
+		check(Result.PoseCost.Dissimilarity >= 0.0f);
+		bool bBetterPose = true;
+		if (CurrentPoseCost.IsValid())
+		{
+			// 这里需要特别注意，可以发现如果要认定Result是一个更好的Pose,不仅仅TotalCost要小，Dissimilarity也要更小，这里我有一个疑惑，这里过于追求Dissimilarity的相似，导致跳转条件过于严苛，即使发现了TotalCost更小的Pose，由于Dissimilarity可能更大，导致无法跳转，有没有可能跟开发者的意愿相违背呢？Debug工具明明显示出来一个更小的TotalCost而没有发生跳转，开发者还需要知道Dissimilarity这一层的比较.
+			// 这种做法的优势一般不轻易发生跳转，动画流畅避免了频繁Search而导致动画一直由离散Pose形成的问题; 如果发生跳转的话，候选Pose肯定在各个方面都优于现在的Pose，Pose切换无明显视觉问题
+			if ((CurrentPoseCost.TotalCost <= Result.PoseCost.TotalCost) || (CurrentPoseCost.Dissimilarity <= Result.PoseCost.Dissimilarity))
+			{
+				bBetterPose = false;
+			}
+			else
+			{
+				// TotalCost以及Dissimilarity都更小还不行，差值的幅度必须大于指定阈值才可以，可以说为了找到好的Pose条件设置的特别苛刻
+				checkSlow(CurrentPoseCost.Dissimilarity > 0.0f && CurrentPoseCost.Dissimilarity > Result.PoseCost.Dissimilarity);
+				const float RelativeSimilarityGain = -1.0f * (Result.PoseCost.Dissimilarity - CurrentPoseCost.Dissimilarity) / CurrentPoseCost.Dissimilarity;
+				bBetterPose = RelativeSimilarityGain >= Settings.MinPercentImprovement / 100.0f;
+			}
+		}
+
+        // 如果得到的候选Pose离当前的Pose太近也不可以跳转(当前Pose前方会导致动画循环卡住的问题；后方则没有必要切换，因为紧接着就会播放到)
+		bool bNearbyPose = false;
+		const FPoseSearchIndexAsset* StateSearchIndexAsset = InOutMotionMatchingState.GetCurrentSearchIndexAsset();
+		if (StateSearchIndexAsset == Result.SearchIndexAsset)
+		{
+			// 这里采用的PoseIdx而并非AssetTime，因为对于BlendSpaces来讲，AssetTime指定并不是时间，而是在区间[0, 1]内标准化后的一个范围值，所以无法与PoseJumpThresholdTime进行比较
+			bNearbyPose = FMath::Abs(InOutMotionMatchingState.DbPoseIdx - Result.PoseIdx) * Database->Schema->SamplingInterval < Settings.PoseJumpThresholdTime;
+
+			// 处理循环动画的情况
+			if (!bNearbyPose && Database->IsSourceAssetLooping(StateSearchIndexAsset))
+			{
+				bNearbyPose = FMath::Abs(StateSearchIndexAsset->NumPoses - InOutMotionMatchingState.DbPoseIdx - Result.PoseIdx) * Database->Schema->SamplingInterval < Settings.PoseJumpThresholdTime;
+			}
+		}
+
+        // 既是好的Pose也没有离太近，这是一个更棒的选择，可以进行跳转 
+		if (bBetterPose && !bNearbyPose)
+		{
+			InOutMotionMatchingState.JumpToPose(Context, Settings, Result);
+		}
+	}
+
+	// 如果没有采用Search的结果，那么看下是否应该Jump到FollowUp的动画上
+	if (!(InOutMotionMatchingState.Flags & EMotionMatchingFlags::JumpedToPose)
+		&& PoseStepper.CanContinue()
+		&& PoseStepper.bJumpRequired)
+	{
+		InOutMotionMatchingState.JumpToPose(Context, Settings, PoseStepper.Result);
+		// 这时候同时标注了JumpedToPose和JumpedToFollowUp
+		InOutMotionMatchingState.Flags |= EMotionMatchingFlags::JumpedToFollowUp;
+	}
+
+    // 没有发生任何Jump, 继续在当前动画上前进, 更新下ElapsedPoseJumpTime
+	if (!(InOutMotionMatchingState.Flags & EMotionMatchingFlags::JumpedToPose))
+	{
+		InOutMotionMatchingState.ElapsedPoseJumpTime += DeltaTime;
+	}
+#if UE_POSE_SEARCH_TRACE_ENABLED
+// TODO DEBUG
+#endif
+}
 //---------------------------------------------------------------------------------------------------------------
 ```
 
@@ -699,9 +886,10 @@ struct POSESEARCH_API FMotionMatchingState
 
 FPoseSearchIndexPreprocessInfo
 UPoseSearchSchema
-
 FDynamicPlayRateSettings
-FMotionMatchingSettings
+
+
+
 
 PoseMatching文档
 单个动画已经完成，多个需要Motion Matching配合，目前有bug
