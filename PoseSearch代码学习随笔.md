@@ -71,7 +71,7 @@ struct FAnimSamplingContext
 	TCustomBoneIndexArray<FQuat, FCompactPoseBoneIndex> ComponentSpaceRefRotations;
 };
 
-// 当采样到[0, AnimLength]以外的区域时，通过外推参数预测样点信息，算法首先算出[0, SampleTime]时间内的位移信息，有了位移和旋转信息后，通过SampleTime算出平移速度和旋转角速度，如果平移速度大于等于指定的阈值LinearSpeedThreshold则外推时使用该平移速度，否则速度设置为0; 旋转角速度同理，阈值为AngularSpeedThreshold
+// 当采样到[Min, Max]以外的区域时，可以通过本参数预测样点信息。如果想要小于Min时间的样点信息，算法首先算出[Min, Min + SampleTime]时间内的位移信息和旋转信息(大于Max则算出[Max - SampleTime, Max]时间内的位移信息和旋转信息)，有了位移和旋转信息后，通过SampleTime算出平移速度和旋转角速度，如果平移速度大于等于指定的阈值LinearSpeedThreshold则外推时使用该平移速度，否则速度设置为0; 旋转角速度同理，阈值为AngularSpeedThreshold
 USTRUCT()
 struct FPoseSearchExtrapolationParameters
 {
@@ -793,7 +793,7 @@ void UpdateMotionMatchingState(
 			EPoseSearchBooleanRequest::FalseValue;
 	}
 
-	// TODO 动态更新Weight情况
+	// TODO lihui 动态更新Weight情况
 	InOutMotionMatchingState.WeightsContext.Update(Settings.Weights, Database);
 
 	// 说明NextFrame找不到且不存在有效的FollowUp动画，这时候强制触发Search（因为这里的缘故，通过给SearchThrottleTime设置很大的值完成MultiPoseMatching的方案是行不通的，因为当动画快结束时会再一次触发Search）
