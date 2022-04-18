@@ -66,16 +66,18 @@ DeltaTransform.Inverse() * Transform * DeltaTransform; ？？
 
 
 
-3月目标:
-PoseSearch看完并且PoseSearch系列完结
+4月目标:
+PoseSearch看完 PoseSearch系列完成MotionMatching, Weight调整
+
 微积分完结
 Maya新手课完结
+四元数完结
 
 
 
 
-1. PoseMatching文档(决定看完代码再写，PoseMatching不稳定，bug较多，现在写没有什么意义，看完代码了解完各个参数后效果更佳！)
-2. 数值分析
+1. PoseMatching文档（完成！）
+2. 数值分析(需要的时候再看)
 3. Mirror,Footlock以及MotionMatchingDemo分拆文档
 4. ALS以及PoseSearch看完
 5. 剖析RootMotion以及AnimNode各个函数含义

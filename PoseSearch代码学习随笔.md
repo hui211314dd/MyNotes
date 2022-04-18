@@ -350,42 +350,436 @@ public: // UObject
 };
 
 
+//Weight Param Begin
 
 
+USTRUCT(BlueprintType, Category = "Animation|Pose Search")
+struct POSESEARCH_API FPoseSearchChannelHorizonParams
+{
+	GENERATED_BODY()
 
-struct FPoseSearchWeightParams
-{}
+    // 控制该Horizon的Weight权重
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings", meta = (ClampMin = "0.0"))
+	float Weight = 1.0f;
+
+	// 如果想每个Sample权重都不相同，则需要调整为true
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Advanced")
+	bool bInterpolate = false;
+
+    // 可以参考FPoseSearchWeights::Init的解释
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Advanced", meta = (EditCondition = "bInterpolate", ClampMin="0.0", ClampMax="1.0"))
+	float InitialValue = 0.1f;
+
+	// 各种插值算法供挑选
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Advanced", meta = (EditCondition = "bInterpolate"))
+	EAlphaBlendOption InterpolationMethod = EAlphaBlendOption::Linear;
+};
+
+USTRUCT(BlueprintType, Category = "Animation|Pose Search")
+struct POSESEARCH_API FPoseSearchChannelWeightParams
+{
+	GENERATED_BODY()
+
+	// 整个ChannelWeight
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings", meta = (ClampMin = "0.0"))
+	float ChannelWeight = 1.0f;
+
+	// History horizon params (for sample offsets <= 0)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings")
+	FPoseSearchChannelHorizonParams HistoryParams;
+
+	// Prediction horizon params (for sample offsets > 0)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings")
+	FPoseSearchChannelHorizonParams PredictionParams;
+
+	// 每个FeatureType的Weight调整
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings")
+	TMap<EPoseSearchFeatureType, float> TypeWeights;
+
+	FPoseSearchChannelWeightParams();
+};
+
+// 可以看到运行时可以动态调整四层中的头两层
+USTRUCT(BlueprintType, Category = "Animation|Pose Search")
+struct POSESEARCH_API FPoseSearchChannelDynamicWeightParams
+{
+	GENERATED_BODY()
+
+    // 整个ChannelWeight的乘数因子，相乘之后再归一化
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings", meta = (ClampMin = "0.0"))
+	float ChannelWeightScale = 1.0f;
+
+	// History Horizon 的乘数因子，相乘之后再归一化
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings", meta = (ClampMin = "0.0"))
+	float HistoryWeightScale = 1.0f;
+
+	// Prediction Horizon 的乘数因子，相乘之后再归一化
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings", meta = (ClampMin = "0.0"))
+	float PredictionWeightScale = 1.0f;
+
+	//...
+};
+
+USTRUCT(BlueprintType, Category = "Animation|Pose Search")
+struct POSESEARCH_API FPoseSearchWeightParams
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings")
+	FPoseSearchChannelWeightParams PoseWeight;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings")
+	FPoseSearchChannelWeightParams TrajectoryWeight;
+
+	FPoseSearchWeightParams();
+};
 
 
+USTRUCT(BlueprintType, Category="Animation|Pose Search")
+struct POSESEARCH_API FPoseSearchDynamicWeightParams
+{
+	GENERATED_BODY()
+
+    // 动态调整Pose Channel Weights的可用参数
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings")
+	FPoseSearchChannelDynamicWeightParams PoseDynamicWeights;
+
+    // 动态调整Trajectory Channel Weights的可用参数
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings")
+	FPoseSearchChannelDynamicWeightParams TrajectoryDynamicWeights;
+
+    // 如果是true，表示Debug时不希望让weight参与计算Cost，一键禁用Weights(强制把所有weight设置为1)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings")
+	bool bDebugDisableWeights = false;
+
+	//...
+};
+
+USTRUCT()
+struct POSESEARCH_API FPoseSearchWeights
+{
+	GENERATED_BODY()
+
+    // 影响Features的权重，参与CompareFeatureVectors的Cost计算，数量等于Schema->Layout.NumFloats
+	UPROPERTY(Transient)
+	TArray<float> Weights;
+
+	bool IsInitialized() const { return !Weights.IsEmpty(); }
+
+	/*
+	Init是计算Weight的核心函数，它的作用是将WeightParams和DynamicWeightParams统一参与到Weights的计算中去，得出Weights值
+	在逐行分析代码前，我们先推导几个结论，有了这几个结论后再看代码会非常容易
+	      A           B
+	     /  \        /  \
+	    a1...an     b1...bn
+
+	条件: A+B = 1，a1+a2+...an = 1, b1+b2+...bn = 1
+	
+	结论1: A*a1 + A*a2 + ... A*an + B*b1 + B*b2 + ... + B*bn = 1
+	结论2：A*a1 + A*a2 + ... A*an = A, B*b1 + B*b2 + ... + B*bn = B
+
+	通过对代码的解析可以看到，PoseSearch可以通过至少四个层级进行Weight调整，层级依次为ChannelType(NormalizedChannelWeights)，HorizonType(NormalizedHorizonWeights), SamplePosition(HorizonWeightsBySample)以及FeatureType(WeightsByType)
+	*/
+	void Init(const FPoseSearchWeightParams& WeightParams, const UPoseSearchSchema* Schema, const FPoseSearchDynamicWeightParams& RuntimeParams)
+	{
+		using namespace UE::PoseSearch;
+	    using namespace Eigen;
+    
+	    // horizon分为History以及Prediction
+	    enum EHorizon : int
+	    {
+	    	History,
+	    	Prediction,
+	    	Num
+	    };
+    
+	    // 可以看到Weights的数量等于NumFloats，加权计算时更简单，参考带Weights的CompareFeatureVectors
+	    Weights.Reset();
+	    Weights.SetNumZeroed(Schema->Layout.NumFloats);
+    
+	    // 调试方便，通过bDebugDisableWeights一键禁用Weights
+	    if (DynamicWeightParams.bDebugDisableWeights)
+	    {
+	    	for (float& Weight: Weights)
+	    	{
+	    		Weight = 1.0f;
+	    	}
+	    	return;
+	    }
+    
+	    // 建立各个参数的索引，方便后面循环内直接引用，这里注意的是，TrajectoryTime和TrajectoryDistance同时使用的TrajectoryWeight
+	    constexpr int ChannelNum = MaxChannels;
+	    const FPoseSearchChannelWeightParams* ChannelWeightParams[ChannelNum];
+	    const FPoseSearchChannelDynamicWeightParams* ChannelDynamicWeightParams[ChannelNum];
+    
+	    ChannelWeightParams[ChannelIdxPose] = &WeightParams.PoseWeight;
+	    ChannelWeightParams[ChannelIdxTrajectoryTime] = &WeightParams.TrajectoryWeight;
+	    ChannelWeightParams[ChannelIdxTrajectoryDistance] = &WeightParams.TrajectoryWeight;
+    
+	    ChannelDynamicWeightParams[ChannelIdxPose] = &DynamicWeightParams.PoseDynamicWeights;
+	    ChannelDynamicWeightParams[ChannelIdxTrajectoryTime] = &DynamicWeightParams.TrajectoryDynamicWeights;
+	    ChannelDynamicWeightParams[ChannelIdxTrajectoryDistance] = &DynamicWeightParams.TrajectoryDynamicWeights;
+    
+	    // 归一化ChannelWeights
+	    Eigen::Array<float, ChannelNum, 1> NormalizedChannelWeights;
+	    for (int ChannelIdx = 0; ChannelIdx != ChannelNum; ++ChannelIdx)
+	    {
+	    	NormalizedChannelWeights[ChannelIdx] = ChannelWeightParams[ChannelIdx]->ChannelWeight * ChannelDynamicWeightParams[ChannelIdx]->ChannelWeightScale;
+    
+	    	// 如果FeatureVectors没有任何ChannelIdx的Feature，直接赋0即可
+	    	int32 FeatureIdx = INDEX_NONE;
+	    	if (!Schema->Layout.EnumerateBy(ChannelIdx, EPoseSearchFeatureType::Invalid, FeatureIdx))
+	    	{
+	    		NormalizedChannelWeights[ChannelIdx] = 0.0f;
+	    	}
+	    }
+    
+	    const float ChannelWeightSum = NormalizedChannelWeights.sum();
+	    if (!FMath::IsNearlyZero(ChannelWeightSum))
+	    {
+	    	NormalizedChannelWeights *= (1.0f / ChannelWeightSum);
+	    }	
+    
+    
+	    // 找出最大的Offset方便后面分配存储足够的内存空间
+	    int32 MaxChannelSampleOffsets = 0;
+	    for (int ChannelIdx = 0; ChannelIdx != ChannelNum; ++ChannelIdx)
+	    {
+	    	TArrayView<const float> ChannelSampleOffsets = Schema->GetChannelSampleOffsets(ChannelIdx);
+	    	MaxChannelSampleOffsets = FMath::Max(MaxChannelSampleOffsets, ChannelSampleOffsets.Num());
+	    }
+    
+	    // WeightsByFeature可以方便地通过Layout中的FeatureIdx查到Weight, 中间生成的Weights结果存于此
+	    TArray<float, TInlineAllocator<32>> WeightsByFeatureStorage;
+	    WeightsByFeatureStorage.SetNum(Schema->Layout.Features.Num());
+	    Eigen::Map<ArrayXf> WeightsByFeature(WeightsByFeatureStorage.GetData(), WeightsByFeatureStorage.Num());
+    
+	    // HorizonWeightsBySample可以方便地通过Schema中的Channel Sample Offsets查到用户设置的Weight
+	    TArray<float, TInlineAllocator<16>> HorizonWeightsBySampleStorage;
+	    HorizonWeightsBySampleStorage.SetNum(MaxChannelSampleOffsets);
+	    Eigen::Map<ArrayXf> HorizonWeightsBySample(HorizonWeightsBySampleStorage.GetData(), HorizonWeightsBySampleStorage.Num());
+    
+	    // WeightsByType可以通过FeatureType查到用户设置的Weight
+	    Eigen::Array<float, (int)EPoseSearchFeatureType::Num, 1> WeightsByType;
+    
+    
+	    // 遍历每个Channel，计算该Channel下对应Feature的Weight
+	    for (int ChannelIdx = 0; ChannelIdx != ChannelNum; ++ChannelIdx)
+	    {
+	    	// 顶层的ChannelWeight已经为0，下面没有必要再计算了
+	    	if (FMath::IsNearlyZero(NormalizedChannelWeights[ChannelIdx]))
+	    	{
+	    		continue;
+	    	}
+    
+	    	// 定义参数，统一处理
+	    	const FPoseSearchChannelWeightParams& ChannelWeights = *ChannelWeightParams[ChannelIdx];
+	    	const FPoseSearchChannelDynamicWeightParams& ChannelDynamicWeights = *ChannelDynamicWeightParams[ChannelIdx];
+	    	TArrayView<const float> ChannelSampleOffsets = Schema->GetChannelSampleOffsets(ChannelIdx);
+    
+	    	// 重置为0
+	    	WeightsByFeature.setConstant(0.0f);
+	    	WeightsByType.setConstant(0.0f);
+	    	HorizonWeightsBySample.setConstant(0.0f);
+    
+    
+	    	// 初始化WeightsByType内容
+	    	for (int Type = 0; Type != (int)EPoseSearchFeatureType::Num; ++Type)
+	    	{
+	    		WeightsByType[Type] = ChannelWeights.TypeWeights.FindRef((EPoseSearchFeatureType)Type);
+    
+	    		// 如果该Type没有启用，设置为0(Database负责设置Weights数值，Schema赋值是否启用)
+	    		int32 FeatureIdx = INDEX_NONE;
+	    		if (!Schema->Layout.EnumerateBy(ChannelIdx, (EPoseSearchFeatureType)Type, FeatureIdx))
+	    		{
+	    			WeightsByType[Type] = 0.0f;
+	    		}
+	    	}
+    
+	    	// 归一化WeightsByType
+	    	float TypeWeightsSum = WeightsByType.sum();
+	    	if (!FMath::IsNearlyZero(TypeWeightsSum))
+	    	{
+	    		WeightsByType *= (1.0f / TypeWeightsSum);
+	    	}
+	    	else
+	    	{
+				// 避免不必要的计算
+	    		continue;
+	    	}
+    
+	        // 计算Sample Offsets中history and prediction horizons的范围，例如TrajectorySampleOffsets如果是{-3, -2, -1, 0, 1, 2}的话，history range为[0, 4), prediction range为[4, 6)
+	    	FInt32Range HorizonSampleIdxRanges[EHorizon::Num];
+	    	{
+	    		int32 IdxUpper = Algo::UpperBound(ChannelSampleOffsets, 0.0f);
+	    		int32 IdxLower = ChannelSampleOffsets[0] <= 0.0f ? 0 : IdxUpper;
+	    		HorizonSampleIdxRanges[EHorizon::History] = FInt32Range(IdxLower, IdxUpper);
+    
+	    		IdxLower = IdxUpper;
+	    		IdxUpper = ChannelSampleOffsets.Num();
+	    		HorizonSampleIdxRanges[EHorizon::Prediction] = FInt32Range(IdxLower, IdxUpper);
+	    	}
+    
+    
+	    	// 初始化NormalizedHorizonWeights
+	    	Eigen::Array<float, 1, EHorizon::Num> NormalizedHorizonWeights;
+	    	NormalizedHorizonWeights.setConstant(0.0f);
+    
+	    	if (!HorizonSampleIdxRanges[EHorizon::History].IsEmpty())
+	    	{
+	    		NormalizedHorizonWeights[EHorizon::History] = ChannelWeights.HistoryParams.Weight * ChannelDynamicWeights.HistoryWeightScale;
+	    	}
+	    	if (!HorizonSampleIdxRanges[EHorizon::Prediction].IsEmpty())
+	    	{
+	    		NormalizedHorizonWeights[EHorizon::Prediction] = ChannelWeights.PredictionParams.Weight * ChannelDynamicWeights.PredictionWeightScale;
+	    	}
+	    	
+	    	// 归一化
+	    	float HorizonWeightSum = NormalizedHorizonWeights.sum();
+	    	if (!FMath::IsNearlyZero(HorizonWeightSum))
+	    	{
+	    		NormalizedHorizonWeights *= (1.0f / HorizonWeightSum);
+	    	}
+	    	else
+	    	{
+	    		// 避免不必要的计算
+	    		continue;
+	    	}
+    
+            // 该函数责任是设置HorizonWeightsBySample，即每个采样点对应的Weights, 这里通过bInterpolate以及InitialValue参数可以控制每个采样点的Weight也可以不同(例如-1采样点的影响比-3采样点大)
+	    	auto SetHorizonSampleWeights = [&HorizonWeightsBySample, &ChannelSampleOffsets](FInt32Range SampleIdxRange, const FPoseSearchChannelHorizonParams& HorizonParams)
+	    	{
+	    		// 组成该Horizon的数量
+	    		int32 SegmentLength = SampleIdxRange.Size<int32>();
+    
+	    		if (SegmentLength > 0)
+	    		{
+	    			int32 SegmentBegin = SampleIdxRange.GetLowerBoundValue();
+	    			if (HorizonParams.bInterpolate && SegmentLength > 1)
+	    			{
+						// 举例，如果TrajectorySampleOffsets为{-3, -2, -1, 0}, InitialValue设置的为0.2，那么计算方法为[-3, 0]映射到[0.2, 0.8]
+	    				// InitialValue的妙用在于如果该值大于0.5的话，Weight就开始以降序的方式映射了
+	    				FVector2f InputRange(ChannelSampleOffsets[SegmentBegin], ChannelSampleOffsets[SegmentBegin + SegmentLength - 1]);
+	    				FVector2f OutputRange(HorizonParams.InitialValue, 1.0f - HorizonParams.InitialValue);
+    
+	    				for (int32 OffsetIdx = SegmentBegin; OffsetIdx != SegmentBegin + SegmentLength; ++OffsetIdx)
+	    				{
+	    					float SampleOffset = ChannelSampleOffsets[OffsetIdx];
+	    					float Alpha = FMath::GetMappedRangeValueUnclamped(InputRange, OutputRange, SampleOffset);
+	    					float Weight = FAlphaBlend::AlphaToBlendOption(Alpha, HorizonParams.InterpolationMethod);
+	    					HorizonWeightsBySample[OffsetIdx] = Weight;
+	    				}
+	    			}
+	    			else
+	    			{
+	    				// 如果不插值，所有的Weight一律平等
+	    				HorizonWeightsBySample.segment(SegmentBegin, SegmentLength).setConstant(1.0f);
+	    			}
+    
+	    			// 归一化处理
+	    			float HorizonSum = HorizonWeightsBySample.segment(SegmentBegin, SegmentLength).sum();
+	    			if (!FMath::IsNearlyZero(HorizonSum))
+	    			{
+	    				HorizonWeightsBySample.segment(SegmentBegin, SegmentLength) *= 1.0f / HorizonSum;
+	    			}
+	    		}
+	    	};
+    
+	        // 这里需要注意的是，调用两次SetHorizonSampleWeights后的结果都存储在HorizonWeightsBySample中，各个Horizon进行了归一化，但整体没有归一化，所以HorizonWeightsBySample最后的sum为2
+	    	SetHorizonSampleWeights(HorizonSampleIdxRanges[EHorizon::History], ChannelWeights.HistoryParams);
+	    	SetHorizonSampleWeights(HorizonSampleIdxRanges[EHorizon::Prediction], ChannelWeights.PredictionParams);
+    
+    
+			// 逐步计算WeightsByFeature中每个FeatureIdx的Weights值，这里是将HorizonWeightsBySample以及WeightsByType参与进来的
+			// 这里有个注意点是HorizonSize，乘HorizonSize的好处是可以提高float计算的精度
+	    	Eigen::Array<float, 1, EHorizon::Num> HorizonSums;
+	    	HorizonSums = 0.0f;
+	    	for (int FeatureIdx = INDEX_NONE; Schema->Layout.EnumerateBy(ChannelIdx, EPoseSearchFeatureType::Invalid, FeatureIdx); /*empty*/)
+	    	{
+	    		const FPoseSearchFeatureDesc& Feature = Schema->Layout.Features[FeatureIdx];
+    
+	    		for (int HorizonIdx = 0; HorizonIdx != EHorizon::Num; ++HorizonIdx)
+	    		{
+	    			if (HorizonSampleIdxRanges[HorizonIdx].Contains(Feature.SubsampleIdx))
+	    			{
+	    				int HorizonSize = HorizonSampleIdxRanges[HorizonIdx].Size<int>();
+	    				WeightsByFeature[FeatureIdx] = HorizonWeightsBySample[Feature.SubsampleIdx] * (HorizonSize * WeightsByType[(int)Feature.Type]);
+	    				HorizonSums[HorizonIdx] += WeightsByFeature[FeatureIdx];
+	    				break;
+	    			}
+	    		}
+	    	}
+    
+	    	// 通过上面的计算如果再除以HorizonSums的话，能保证每个Horizon都归一化且各自sum等于1，但是总的sum等于2，这里每个Horizon乘以NormalizedHorizonWeights，每个Horizon的sum等于对应的NormalizedHorizonWeights，因为NormalizedHorizonWeights本身是归一化的，所以经过NormalizedHorizonWeights[HorizonIdx] / HorizonSums[HorizonIdx]处理后，WeightsByFeature的sum等于1
+	    	for (int FeatureIdx = INDEX_NONE; Schema->Layout.EnumerateBy(ChannelIdx, EPoseSearchFeatureType::Invalid, FeatureIdx); /*empty*/)
+	    	{
+	    		const FPoseSearchFeatureDesc& Feature = Schema->Layout.Features[FeatureIdx];
+    
+	    		for (int HorizonIdx = 0; HorizonIdx != EHorizon::Num; ++HorizonIdx)
+	    		{
+	    			if (HorizonSampleIdxRanges[HorizonIdx].Contains(Feature.SubsampleIdx))
+	    			{
+	    				float HorizonWeight = NormalizedHorizonWeights[HorizonIdx] / HorizonSums[HorizonIdx];
+	    				WeightsByFeature[FeatureIdx] *= HorizonWeight;
+	    				break;
+	    			}
+	    		}
+	    	}
+    
+	    	// 因为此时WeightsByFeature的sum已经等于1，所以乘以NormalizedChannelWeights[ChannelIdx]后，WeightsByFeature.sum()必然等于NormalizedChannelWeights[ChannelIdx]
+	    	WeightsByFeature *= NormalizedChannelWeights[ChannelIdx];
+    
+	    	ensure(FMath::IsNearlyEqual(WeightsByFeature.sum(), NormalizedChannelWeights[ChannelIdx], KINDA_SMALL_NUMBER));
+    
+	    	// 还有最后一步就是将WeightsByFeature拷贝给Weights, 方法也很简单，计算每个Feature对应多少个Float，然后拷贝即可
+	    	for (int FeatureIdx = INDEX_NONE; Schema->Layout.EnumerateBy(ChannelIdx, EPoseSearchFeatureType::Invalid, FeatureIdx); /*empty*/)
+	    	{
+	    		const FPoseSearchFeatureDesc& Feature = Schema->Layout.Features[FeatureIdx];
+	    		int32 ValueSize = GetFeatureTypeTraits(Feature.Type).NumFloats;
+	    		int32 ValueTerm = Feature.ValueOffset + ValueSize;
+	    		for (int32 ValueIdx = Feature.ValueOffset; ValueIdx != ValueTerm; ++ValueIdx)
+	    		{
+	    			Weights[ValueIdx] = WeightsByFeature[FeatureIdx];
+	    		}
+	    	}
+	    }
+	}
+};
+
+// 最顶层的Weight封装，使用者可以直接拿到默认组或者制定组的FPoseSearchWeights
 struct FPoseSearchWeightsContext
 {
 public:
-	// Check if the database or runtime weight parameters have changed and then computes and caches new group weights
+    // UpdateMotionMatchingState会调用此Update, 此函数会检查是否需要重新计算Weights(比如当Database更换或者传入的DynamicWeights同内部缓存的不一致时)
+	// 此函数会调用FPoseSearchWeights::Init，FPoseSearchWeights::Init是计算Weights的核心函数
 	void Update(const FPoseSearchDynamicWeightParams& DynamicWeights, const UPoseSearchDatabase * Database);
 
 	const FPoseSearchWeights* GetGroupWeights (int32 WeightsGroupIdx) const;
 	
 private:
+    // Weights对应的Database, 当Database发生改变时需要重新计算Weights
 	UPROPERTY(Transient)
 	TWeakObjectPtr<const UPoseSearchDatabase> Database = nullptr;
 
+    // 下面的Weights都是基于这里的参数生成的，缓存一份是为了比较，当发现不一致时需要重新计算Weights
 	UPROPERTY(Transient)
 	FPoseSearchDynamicWeightParams DynamicWeights;
 
+    // 默认Weights
 	UPROPERTY(Transient)
 	FPoseSearchWeights ComputedDefaultGroupWeights;
 
+    // Group的Weights,索引值与ActiveDatabase->Groups一一对应
 	UPROPERTY(Transient)
 	TArray<FPoseSearchWeights> ComputedGroupWeights;
 };
 
+//Weight Param End
 
 
 // 返回DbSequence.Sequence中的有效采样范围，如果动画中有UAnimNotifyState_PoseSearchExcludeFromDatabase，则分成多个Range返回
 // 距离动画SamplingRange设置的是[0, 100],同时UAnimNotifyState_PoseSearchExcludeFromDatabase设置区域为[20, 50],那么返回值为[0, 20)和(50, 100]
 void FindValidSequenceIntervals(const FPoseSearchDatabaseSequence& DbSequence, TArray<FFloatRange>& ValidRanges)
-
-
 
 
 // 当保存UPoseSearchDatabase资源时会调用PreSave函数，根据设置项生成SearchIndex数据，供Query使用。
@@ -529,7 +923,7 @@ struct FSearchContext
 	   如果请求为FalseValue表示希望候选Pose是源数据，如果这时候候选Pose不是源数据而是镜像数据，需要增加MirrorMismatchCost额外消耗
 	*/
 	EPoseSearchBooleanRequest QueryMirrorRequest = EPoseSearchBooleanRequest::Indifferent;
-	// TODO
+	// 包含所有组的Weights信息，如果传入了可以加权计算Cost
    const FPoseSearchWeightsContext* WeightsContext = nullptr;
    // TODO
 	const FGameplayTagQuery* DatabaseTagQuery = nullptr;
@@ -692,7 +1086,7 @@ struct POSESEARCH_API FMotionMatchingState
 	UPROPERTY(Transient)
 	FPoseSearchFeatureVectorBuilder ComposedQuery;
 
-	// Precomputed runtime weights
+	// 用于加权计算Cost，同时也提供了机制可以通过外部(比如FMotionMatchingSettings::Weights)动态改变Weights
 	UPROPERTY(Transient)
 	FPoseSearchWeightsContext WeightsContext;
 
@@ -793,7 +1187,7 @@ void UpdateMotionMatchingState(
 			EPoseSearchBooleanRequest::FalseValue;
 	}
 
-	// TODO lihui 动态更新Weight情况
+	// 动态更新Weight情况,提供了外部可以实时调整Weights的机制
 	InOutMotionMatchingState.WeightsContext.Update(Settings.Weights, Database);
 
 	// 说明NextFrame找不到且不存在有效的FollowUp动画，这时候强制触发Search（因为这里的缘故，通过给SearchThrottleTime设置很大的值完成MultiPoseMatching的方案是行不通的，因为当动画快结束时会再一次触发Search）
@@ -889,9 +1283,6 @@ UPoseSearchSchema
 FDynamicPlayRateSettings
 
 
-
-
-PoseMatching文档
 单个动画已经完成，多个需要Motion Matching配合，目前有bug
 MetaData中SamplingRange与AnimState_Block的关系以及Range参数含义等(帧数还是时间？)
 
@@ -902,3 +1293,51 @@ Preprocess，Distance的理解以及应用
 Mirror原理(重点并且细致的剖析)，资料有MMDemo, ControlRig/Maya生成Mirror逻辑，PoseSearch等, MirrorTransform？, LU停步动画Mirrored后有位移，bug？
 Footlock
 修复MotionMatching Node填入DB后不生效的bug
+概念理解：Channel, Weight, FeatureDesc, FeatureType, FeatureDomain,  需要举例说明
+
+
+
+
+
+![Weight调整结构图](./UE5PoseSearchNotePic/1.png)
+Horizon:
+        History      SampleTime <= 0
+		Prediction   SampleTime >  0
+
+举例：
+PoseSamples = {-0.2, -0.1, 0} 
+TrajectorySamples = {-0.2, -0.1, 0, 0.1, 0.2}
+
+处理ChannelIndex = 1时
+
+NormalizedChannelWeights = {0.5, 0.5, 0}
+
+WeightsByType = {0.5, 0, 0.5, 0, 0} -- Normalized, 包括Position, Rotation, LinearVelocity, AngularVelocity, ForwardVector
+
+HorizonSampleIdxRanges = {[0, 3), [3, 5)}
+
+NormalizedHorizonWeights = {0.5, 0.5}  --   ChannelWeights.HistoryParams.Weight    * ChannelDynamicWeights.HistoryWeightScale
+                                       --Or ChannelWeights.PredictionParams.Weight * ChannelDynamicWeights.PredictionWeightScale
+
+
+HorizonWeightsBySample = {0.3333, 0.3333, 0.3333, 0.5, 0.5} --Normalized
+
+FeatureNum = 28 (PoseFeatureNum = (3个采样点 * 2个采样骨骼 * 3个FeatureType) = 18, TrajectoryFeatureNum = (5个采样点 * 2个FeatureType) = 10)
+
+WeightsByFeature[0] = 0.33333 * 3 * 0.5 = 0.5 /6 = 1/12
+...
+WeightsByFeature[5] = 0.33333 * 3 * 0.5 = 0.5 /6 = 1/12
+WeightsByFeature[6] = 0.5 * 2 * 0.5     = 0.5 /4 = 1 /8
+...
+WeightsByFeature[9] = 0.5 * 2 * 0.5     = 0.5/4  = 1 /8
+
+HorizonSums = {3, 2}
+
+
+ChannelType(NormalizedChannelWeights)
+
+HorizonType(NormalizedHorizonWeights)
+
+SampleWeightType(HorizonWeightsBySample)
+
+FeatureType(WeightsByType)
