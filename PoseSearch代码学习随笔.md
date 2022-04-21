@@ -26,7 +26,6 @@ struct FPoseSearchFeatureVectorBuilder
 
 // 正如注释里说明的，SequenceStartInterval表示Sequence开头多长时间的动画禁止Transition，这样的话，后面的数据帧会有正确的Past trajectory数据
 // SequenceEndInterval表示末尾多长时间的动画禁止Transition, 这样的话，不仅前面的数据帧会有正确的future trajectory,并且可以避免transition后瞬间结束的现象
-// 这里有个问题是，PoseMatching(即UPoseSearchSequenceMetaData)中其实不需要这两个参数，而且UPoseSearchSequenceMetaData并没有选项设置，导致SequenceEndInterval一直在使用0.2的默认值，如果这时候我设置SampleRange为[0, 0.2]的话其实是无效的，导致没有帧可用了，准备发个Pull Request修改下；DatabaseAsset可以直接设置
 
 //  SequenceStartInterval                      SequenceEndInterval
 //  *********************++++++++++...+++++++++*******************
@@ -213,10 +212,6 @@ struct FPoseSearchIndexAsset
 }
 
 
-
-
-
-
 // 经过Init以及Process函数处理后，Input会赋值为传入的Input，Output会设置为相应的值.
 // 该类是BuildIndex计算过程中最核心的类
 // FSequenceIndexer的数量等于FPoseSearchIndexAsset的数量
@@ -239,7 +234,7 @@ public:
 		bool bMirrored = false;
         // 传入采样的范围，单位为时间而不是帧数,范围clamp在[0, AnimLength]内
 		FFloatInterval RequestedSamplingRange = FFloatInterval(0.0f, 0.0f);
-		// 正如上面说过，PoseMatching(即UPoseSearchSequenceMetaData)时SequenceEndInterval默认值一直是0.2f,如果采样范围小于0.2f的话，会导致采样失败的...这里要特别注意！
+		//
 		FPoseSearchBlockTransitionParameters BlockTransitionParameters;
 	} Input;
 
@@ -1029,7 +1024,7 @@ struct POSESEARCH_API FMotionMatchingSettings
 {
 	GENERATED_BODY()
 
-	// Dynamic weights for influencing pose selection
+    // 动态调整Weights参数从而影响Pose的选取
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(PinHiddenByDefault))
 	FPoseSearchDynamicWeightParams Weights;
 
@@ -1274,26 +1269,25 @@ void UpdateMotionMatchingState(
 }
 //---------------------------------------------------------------------------------------------------------------
 ```
-
-
-
-
-FPoseSearchIndexPreprocessInfo
+Trajectory FeatureVector
+Debug
+概念理解：Channel, Weight, FeatureDesc, FeatureType, FeatureDomain,  需要举例说明
 UPoseSearchSchema
+
 FDynamicPlayRateSettings
+FPoseSearchIndexPreprocessInfo
 
-
-单个动画已经完成，多个需要Motion Matching配合，目前有bug
-MetaData中SamplingRange与AnimState_Block的关系以及Range参数含义等(帧数还是时间？)
 
 MultiPoseMatching配合AnimState_BlockTransition如何使用？(如何设置仅仅查询一次，然后顺序播放即可)
+-- 目前Transition不能提前退出状态导致一直反复Search
+
 Group如何使用？
 Preprocess，Distance的理解以及应用
 
 Mirror原理(重点并且细致的剖析)，资料有MMDemo, ControlRig/Maya生成Mirror逻辑，PoseSearch等, MirrorTransform？, LU停步动画Mirrored后有位移，bug？
 Footlock
 修复MotionMatching Node填入DB后不生效的bug
-概念理解：Channel, Weight, FeatureDesc, FeatureType, FeatureDomain,  需要举例说明
+
 
 
 
