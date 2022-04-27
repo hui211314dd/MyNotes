@@ -298,10 +298,12 @@ private:
   	void SampleBegin(int32 SampleIdx);
 
 	// 根据Schema设置的SampledBones以及PoseSampleTimes信息，算出SampleIdx的对应的f(s-h), f(s)以及f(s+h)的信息，算出位置和速度，最后设置到FeatureVector
-	// 需要注意的是，这个过程中计算出来的位置信息都是相对于当前采样点，同样速度方向也是，这样做是为了将来Feature比较时方便
+	// 需要注意的是，这个过程中计算出来的位置信息都是相对于当前采样点(比如脚部骨骼位置是基于当前Sample的RootTransform的)，同样速度方向也是，这样做是为了将来Feature比较时方便
 	void AddPoseFeatures(int32 SampleIdx);
 
-	// TODO
+	// 根据Schema设置的TrajectorySampleDistances或者TrajectorySampleTimes信息，算出SampleIdx的对应的f(s-h), f(s)以及f(s+h)的信息，算出位置和速度，最后设置到FeatureVector
+	// 需要注意的是，这个过程中计算出来的位置信息都是相对于当前采样点，同样速度方向也是，这样做是为了将来Feature比较时方便
+	// TimeDomain和DistanceDomain可以二选一，也可以同时使用，Trajectory的含义可以是0.1秒后的位置速度(TimeDomain),也可以是10米后的位置速度(DistanceDomain)
 	void AddTrajectoryTimeFeatures(int32 SampleIdx);
 	void AddTrajectoryDistanceFeatures(int32 SampleIdx);
 
@@ -1269,24 +1271,57 @@ void UpdateMotionMatchingState(
 }
 //---------------------------------------------------------------------------------------------------------------
 ```
-Trajectory FeatureVector
-Debug
-概念理解：Channel, Weight, FeatureDesc, FeatureType, FeatureDomain,  需要举例说明
-UPoseSearchSchema
 
-FDynamicPlayRateSettings
-FPoseSearchIndexPreprocessInfo
 
 
 MultiPoseMatching配合AnimState_BlockTransition如何使用？(如何设置仅仅查询一次，然后顺序播放即可)
 -- 目前Transition不能提前退出状态导致一直反复Search
 
+Distance的理解以及应用？
+-- 正常MM采用的TimeTrajectory，但PoseSearch提供了DistanceTrajectory,即Control里提到的，Time和Distance可以二选一，也可以同时使用
+TODO Control再看一遍Distance章节
+
+
+
+
+
+
+
+
+
+
+下周:
+概念理解：Channel, Weight, FeatureDesc, FeatureType, FeatureDomain,  Horizon 需要举例说明
+
 Group如何使用？
-Preprocess，Distance的理解以及应用
+
+PoseSearch:MotionMatching 文档
 
 Mirror原理(重点并且细致的剖析)，资料有MMDemo, ControlRig/Maya生成Mirror逻辑，PoseSearch等, MirrorTransform？, LU停步动画Mirrored后有位移，bug？
 Footlock
+
+
+
+
+
+
+
+
+
+Debug代码
+UPoseSearchSchema
+FDynamicPlayRateSettings
+FPoseSearchIndexPreprocessInfo
+Preprocess
 修复MotionMatching Node填入DB后不生效的bug
+
+
+
+难点:
+Trajectory转90度
+LeadIn和FollowUp采样过程，Cycle问题
+Mirror
+Sample过程中Feature计算
 
 
 
@@ -1335,3 +1370,19 @@ HorizonType(NormalizedHorizonWeights)
 SampleWeightType(HorizonWeightsBySample)
 
 FeatureType(WeightsByType)
+
+
+
+
+
+PoseFeature和Trajectory计算速度和加速时的方程:
+
+$\dot{f(t)} = (f(t+h) - f(t-h))/2h$
+
+
+
+$f(t)$ + $\dot{f(t)} \cdot h$ + ${1} \over {2}$$\ddot{f{t}}$$\cdot h^2$$=f(t+h)$
+
+展开可得
+
+$\ddot{f{t}}$ = $(f(t+h) +f(t-h)-2\cdot f(t))/h^2$
