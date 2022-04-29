@@ -1,4 +1,5 @@
-UE5中MotionMatching(四) MotionMatching
+#! https://zhuanlan.zhihu.com/p/507268359
+# UE5中的MotionMatching(四) MotionMatching
 
 ## 前言
 终于要写到最核心的MotionMatching了！我会尽可能地把涉及到的细节用图表展示出来，如果有必要，我会举例说明。在阅读前我建议你先按照[UE5中MotionMatching(二) 创建可运行的PoseSearch工程](https://zhuanlan.zhihu.com/p/455983339)的教程创建好工程并且运行起来，这样通过调试可以很好地理解细节问题~
@@ -60,8 +61,6 @@ PoseSearch插件路径：UnrealEngine\Engine\Plugins\Experimental\Animation\Pose
 * Horizon, 用于区分不同区间段的Samples, 比如对于SampleTime <= 0的，说明使用的是历史数据，SampleTime > 0则需要进行预测，所以Horizon分为History和Prediction, 在调整Weight时可以设置给History和Prediction不同的权重值
   
 * Weight, 计算Cost时不同的Feature重要性可能不太一样，比如我们可能会认为脚部骨骼的Position Feature权重比Rotation Feature的高，这样的话，Position Feature更能影响动画的选择。举例我们现在有两个候选Pose，[Position, Rotation]数值分别为[1, 2], [5, 8],我们当前的[Position, Rotation]为[1, 8],如果Weight为[1, 1]的话，两个候选Pose的Cost分别为6(计算过程abs(1-1)*1 + abs(2-8)*1)和4(计算过程abs(5-1)*1 + abs(8-8)*1)，MotionMatching会选择后者，因为Cost更小，但是如果Weight变成[2, 1]的话，两个候选Pose的Cost就变成了6和8，MotionMatching会选择前者
-
-* Group TODO
 
 ### 配置PoseSearchSchema以及各参数含义
 ![配置PoseSearchSchema](./UE5MotionMatchingPic/1.png)
@@ -161,35 +160,272 @@ BuildIndex执行完毕后，UPoseSearchDatabase::SearchIndex存储的数据为�
 
 ![BuildIndex流程](./UE5MotionMatchingPic/7.jpg)
 
-到这里，我们的数据已经完全准备好了！
+到这里，我们的数据已经完全准备好了, 接下来我们看下动画蓝图需要做哪些工作呢
 
 ### 动画节点MotionMatchingNode参数含义
 
+可以看到动画蓝图的AnimGraph内容非常少，Inertialization为MotionMatching节点服务，负责动画融合，PoseHistory负责存储History Pose数据，也是为MotionMatching节点服务，因为两个节点的比较简单，这里不再赘述，我们重点说下MotionMatchingNode各个参数的含义
+
+![AnimGraph](./UE5MotionMatchingPic/8.png)
+
+* Database: 填入配置好的PoseSearchDatabase
+
+* Use Database Tag Query: 是否启用TagQuery即Group查询，在PoseSearchDatabase时我们讲过每个Sequence可以指定Group信息，当启用Group查询时，只有Match DatabaseTagQuery的Sequence才会被考虑，其他不满足条件的Sequence甚至不会参与Cost比较
+
+* Database Tag Query: 填入查询所需的Group信息， Use Database Tag Query为true时生效
+
+* Trajectory: MotionTrajectory生成的Trajectory信息，MotionMatching的核心算法需要拿Trajectory和当前Pose情况组装成QueryFeatureVectors进行Search
+
+* Dynamic Play Rate Settings: 动态控制每帧动画的播放速率，后面详细来讲
+
+* Setttings: MotionMatching一些额外的控制项，如下:
+  
+  * Weights: 动态调整Weights，下面的Weights Balancing详细来讲
+  
+  * BlendTime: 当需要blend out到某个新姿势时，这里控制的是融合的时间，因为使用的是惯性化插值所以MotionMatchingNode后面需要跟上一个InertializationNode
+  
+  * MirrorChangeBlendTime: 如果说当前播放的Pose与Search得到的TargetPose在Mirror属性上不一致，并且MirrorChangeBlendTime大于0，那么不再使用上面的BlendTime而是使用MirrorChangeBlendTime
+  
+  * PoseJumpThresholdTime: Search返回的最佳候选帧ResultPose与当前帧CurPose如果同属一个FPoseSearchIndexAsset并且两帧之间的时间差小于PoseJumpThresholdTime阈值，说明候选帧就在附近，不可以Jump
+  
+  * SearchThrottleTime: 两次查询的最小间隔时间，一方面可以避免每帧都Search, 从动画效果以及性能上都有提升，另外，当应用MultiPoseMatching时，可以将这个值设置为一个很大的值，保证就Search一次(其实不能保证，后面代码解析可以看到，当Asset播放快完毕时会强制Search)
+  
+  * MinPercentImprovement: 我们发现Search返回的最佳候选帧ResultPose与当前帧CurPose相比而言，候选帧的TotalCost和Dissimilarity都要小，MinPercentImprovement这个参数表示当(CurPose.Dissimilarity - ResultPose.Dissimilarity)/CurPose.Dissimilarity 大于这个MinPercentImprovement百分比时(默认值40表示 40% )，我们才会认为有了显著的提升，进而才会考虑Jump
+
+* Debug Draw: 是否显示调试信息
+
+* Debug Draw Query: 是否显示QueryFeatureVector的调试信息
+
+* Debug Draw Match: 是否显示匹配的调试信息
+ 
 ### MotionMatchingNode运行时代码解析
+
+MotionMatchingNode的代码在AnimNode_MotionMatching.cpp中，可以看到内部包含了MirrorNode用来完成镜像功能，还有就是SequencePlayerNode完成动画采样和播放，最最核心的内容在UpdateMotionMatchingState中，里面包含了MotionMatching的核心算法，我们逐行看下它都干了啥(PoseSearch持续开发中，所以后面你看到的时候不一定是这个样子了:) )
+
+```C++
+void UpdateMotionMatchingState(
+	const FAnimationUpdateContext& Context,
+	const UPoseSearchDatabase* Database,
+	const FGameplayTagQuery* DatabaseTagQuery,
+	const FTrajectorySampleRange& Trajectory,
+	const FMotionMatchingSettings& Settings,
+	FMotionMatchingState& InOutMotionMatchingState
+)
+{
+	using namespace UE::PoseSearch;
+    
+	if (!Database)
+	{
+		Context.LogMessage(EMessageSeverity::Error, LOCTEXT("NoDatabase", "No database provided for motion matching."));
+		return;
+	}
+
+  // 运行时Database发生了改变，需要重新初始化
+	InOutMotionMatchingState.Flags = EMotionMatchingFlags::None;
+	if (InOutMotionMatchingState.CurrentDatabase != Database)
+	{
+		FText InitError;
+		if (!InOutMotionMatchingState.InitNewDatabaseSearch(Database, Settings.SearchThrottleTime, &InitError))
+		{
+			Context.LogMessage(EMessageSeverity::Error, InitError);
+			return;
+		}
+	}
+
+	const float DeltaTime = Context.GetDeltaTime();
+
+	// 使用PoseStepper尝试看下DeltaTime后即NextFrame是否存在有效的采样动画，内部会判断是否需要Jump
+	FMotionMatchingPoseStepper PoseStepper;
+	PoseStepper.Update(Context, InOutMotionMatchingState);
+	if (PoseStepper.CanContinue())
+	{
+		// 注意，这里返回的Result仍然是步进前的状态
+		InOutMotionMatchingState.DbPoseIdx = PoseStepper.Result.PoseIdx;
+		InOutMotionMatchingState.SearchIndexAssetIdx = 
+			InOutMotionMatchingState.CurrentDatabase->SearchIndex.FindAssetIndex(PoseStepper.Result.SearchIndexAsset);
+	}
+
+	// 构建查询所需的FeatureVectorBuilder
+	if (InOutMotionMatchingState.DbPoseIdx != INDEX_NONE)
+	{
+		// 直接Copy DbPoseIdx存储的Pose信息
+		InOutMotionMatchingState.ComposedQuery.CopyFromSearchIndex(Database->SearchIndex, InOutMotionMatchingState.DbPoseIdx);
+	}
+	else
+	{
+		// 首次调用或者Database运行时改变的时候，从PoseHistoryProvider读取历史值
+		IPoseHistoryProvider* PoseHistoryProvider = Context.GetMessage<IPoseHistoryProvider>();
+		if (PoseHistoryProvider)
+		{
+			FPoseHistory& History = PoseHistoryProvider->GetPoseHistory();
+			InOutMotionMatchingState.ComposedQuery.TrySetPoseFeatures(
+				&History, 
+				Context.AnimInstanceProxy->GetRequiredBones());
+		}
+	}
+
+	// 与Trajectory组合
+	InOutMotionMatchingState.ComposeQuery(Database, Trajectory);
+
+  // 构建查询所需的FSearchContext，需要注意的是QueryMirrorRequest，默认方案是QueryMirrorRequest请求当前播放动画资源的Mirrored情况，即当前播放的是Mirrored资源，那么请求的时候也希望是Mirrored资源，否则的话会有MirrorMisMatchCost
+	FSearchContext SearchContext;
+	SearchContext.SetSource(InOutMotionMatchingState.CurrentDatabase.Get());
+	SearchContext.QueryValues = InOutMotionMatchingState.ComposedQuery.GetNormalizedValues();
+	SearchContext.WeightsContext = &InOutMotionMatchingState.WeightsContext;
+	SearchContext.DatabaseTagQuery = DatabaseTagQuery;
+	if (const FPoseSearchIndexAsset* CurrentIndexAsset = InOutMotionMatchingState.GetCurrentSearchIndexAsset())
+	{
+		SearchContext.QueryMirrorRequest =
+			CurrentIndexAsset->bMirrored ?
+			EPoseSearchBooleanRequest::TrueValue :
+			EPoseSearchBooleanRequest::FalseValue;
+	}
+
+	// 动态更新Weight情况,提供了外部可以实时调整Weights的机制
+	InOutMotionMatchingState.WeightsContext.Update(Settings.Weights, Database);
+
+	// 说明NextFrame找不到且不存在有效的FollowUp动画，这时候强制触发Search（因为这里的缘故，通过给SearchThrottleTime设置很大的值完成MultiPoseMatching的方案是行不通的，因为当动画快结束时会再一次触发Search）
+	if (!PoseStepper.CanContinue())
+	{
+		FSearchResult Result = Search(SearchContext);
+		InOutMotionMatchingState.JumpToPose(Context, Settings, Result);
+	}
+
+	// ElapsedPoseJumpTime累计时间超过了阈值SearchThrottleTime，需要再一次Search
+	else if ((InOutMotionMatchingState.ElapsedPoseJumpTime >= Settings.SearchThrottleTime))
+	{
+		// 首先通过比较当前的Pose与SearchContext中的FeatureVector计算出CurrentPoseCost作为参考值
+		FPoseCost CurrentPoseCost;
+		if (InOutMotionMatchingState.DbPoseIdx != INDEX_NONE)
+		{
+			const FPoseSearchIndexAsset* SearchIndexAsset = &Database->SearchIndex.Assets[InOutMotionMatchingState.SearchIndexAssetIdx];
+			CurrentPoseCost = ComparePoses(InOutMotionMatchingState.DbPoseIdx, SearchContext, SearchIndexAsset->SourceGroupIdx);
+		}
+
+		// Search查找最匹配的Frame
+		FSearchResult Result = Search(SearchContext);
+
+		// 需要比较下Result与CurrentPose,只有当Result比CurrentPose更相似并且不在附近区域的时候，我们才能认定可以进行跳转
+		check(Result.PoseCost.Dissimilarity >= 0.0f);
+		bool bBetterPose = true;
+		if (CurrentPoseCost.IsValid())
+		{
+			// 这里需要特别注意，可以发现如果要认定Result是一个更好的Pose,不仅仅TotalCost要小，Dissimilarity也要更小，这里我有一个疑惑，这里过于追求Dissimilarity的相似，导致跳转条件过于严苛，即使发现了TotalCost更小的Pose，由于Dissimilarity可能更大，导致无法跳转，有没有可能跟开发者的意愿相违背呢？Debug工具明明显示出来一个更小的TotalCost而没有发生跳转，开发者还需要知道Dissimilarity这一层的比较.
+			// 这种做法的优势一般不轻易发生跳转，动画流畅避免了频繁Search而导致动画一直由离散Pose形成的问题; 如果发生跳转的话，候选Pose肯定在各个方面都优于现在的Pose，Pose切换无明显视觉问题
+			if ((CurrentPoseCost.TotalCost <= Result.PoseCost.TotalCost) || (CurrentPoseCost.Dissimilarity <= Result.PoseCost.Dissimilarity))
+			{
+				bBetterPose = false;
+			}
+			else
+			{
+				// TotalCost以及Dissimilarity都更小还不行，差值的幅度必须大于指定阈值才可以，可以说为了找到好的Pose条件设置的特别苛刻
+				checkSlow(CurrentPoseCost.Dissimilarity > 0.0f && CurrentPoseCost.Dissimilarity > Result.PoseCost.Dissimilarity);
+				const float RelativeSimilarityGain = -1.0f * (Result.PoseCost.Dissimilarity - CurrentPoseCost.Dissimilarity) / CurrentPoseCost.Dissimilarity;
+				bBetterPose = RelativeSimilarityGain >= Settings.MinPercentImprovement / 100.0f;
+			}
+		}
+
+    // 如果得到的候选Pose离当前的Pose太近也不可以跳转(当前Pose前方会导致动画循环卡住的问题；后方则没有必要切换，因为紧接着就会播放到)
+		bool bNearbyPose = false;
+		const FPoseSearchIndexAsset* StateSearchIndexAsset = InOutMotionMatchingState.GetCurrentSearchIndexAsset();
+		if (StateSearchIndexAsset == Result.SearchIndexAsset)
+		{
+			// 这里采用的PoseIdx而并非AssetTime，因为对于BlendSpaces来讲，AssetTime指定并不是时间，而是在区间[0, 1]内标准化后的一个范围值，所以无法与PoseJumpThresholdTime进行比较
+			bNearbyPose = FMath::Abs(InOutMotionMatchingState.DbPoseIdx - Result.PoseIdx) * Database->Schema->SamplingInterval < Settings.PoseJumpThresholdTime;
+
+			// 处理循环动画的情况
+			if (!bNearbyPose && Database->IsSourceAssetLooping(StateSearchIndexAsset))
+			{
+				bNearbyPose = FMath::Abs(StateSearchIndexAsset->NumPoses - InOutMotionMatchingState.DbPoseIdx - Result.PoseIdx) * Database->Schema->SamplingInterval < Settings.PoseJumpThresholdTime;
+			}
+		}
+
+    // 既是好的Pose也没有离太近，这是一个更棒的选择，可以进行跳转 
+		if (bBetterPose && !bNearbyPose)
+		{
+			InOutMotionMatchingState.JumpToPose(Context, Settings, Result);
+		}
+	}
+
+	// 如果没有采用Search的结果，那么看下是否应该Jump到FollowUp的动画上
+	if (!(InOutMotionMatchingState.Flags & EMotionMatchingFlags::JumpedToPose)
+		&& PoseStepper.CanContinue()
+		&& PoseStepper.bJumpRequired)
+	{
+		InOutMotionMatchingState.JumpToPose(Context, Settings, PoseStepper.Result);
+		// 这时候同时标注了JumpedToPose和JumpedToFollowUp
+		InOutMotionMatchingState.Flags |= EMotionMatchingFlags::JumpedToFollowUp;
+	}
+
+    // 没有发生任何Jump, 继续在当前动画上前进, 更新下ElapsedPoseJumpTime
+	if (!(InOutMotionMatchingState.Flags & EMotionMatchingFlags::JumpedToPose))
+	{
+		InOutMotionMatchingState.ElapsedPoseJumpTime += DeltaTime;
+	}
+#if UE_POSE_SEARCH_TRACE_ENABLED
+// TODO DEBUG
+#endif
+}
+```
+
+至于另外一个核心函数Search实现就比较简单了，仅仅比较Feature取出最小的Cost即可，这里就不再谈了
 
 ### Weights Balancing
 
+运行时我们经常希望能够动态地调整Weight然后立刻看下改变后的情景，这时候就需要用到上面Setting中的Weights了
+
+![Setting中的Weights](./UE5MotionMatchingPic/9.png)
+
+我们看下每个参数的详细含义吧：
+
+* Pose Dynamic Weights: 动态控制PoseChannel的WeightScale
+  * Channel Weight Scale: 对整个Channel的权重进行缩放
+  
+  * History Weight Scale: 对该Channel下History Horizon进行权重缩放
+  
+  * Prediction Weight Scale: 对该Channel下Prediction Horizon进行权重缩放
+  
+* Trajectory Dynamic Weights: 动态控制TrajectoryChannel的WeightScale
+  * 同上
+
+* Debug Disable Weights: 如果是true，表示不希望让Weights参与计算Cost，一键禁用Weights(强制把所有weight设置为1)
+  
+![Weights控制的是Channel和Horizon](./UE5MotionMatchingPic/10.png)
+
+可以看到Setting中的Weights控制的是Channel Weight和Horizon Weight的缩放
+
 ## Bonus
-Games_Inu Twitter
 
-O3de参考资料
+[Inu_Games](https://twitter.com/games_inu)在推特上做了不少实践，有些总结和视频效果挺不错的，可以看看~
 
-Layout的讨论以及Simon Clavet的视频讲解
+O3de引擎在几个月前也推出了[MotionMatching的开源工程](https://github.com/hui211314dd/o3de/tree/development/Gems/MotionMatching)，代码漂亮简洁，重要的是教程特别适合刚接触MotionMatching的同学，值得推荐！
+
+前几天育碧官网放出了一篇介绍[《孤岛惊魂6》的MotionMatching系统Choreograph](https://news.ubisoft.com/en-us/article/27176jslYNMPt7vBfCaRQ1/far-cry-6-how-ai-helped-animate-yaras-hero)，相比于传统做法有哪些提升以及对于动画师工作流上的改变，值得一读！
+
+[Daniel Holden在21年10月份发起过一个特别有意思的讨论](https://twitter.com/anorangeduck/status/1449420737895440393)
+
+![内容截图](./UE5MotionMatchingPic/11.png)
+
+然后Simon Clavet在后面跟帖说了下MotionMatching中关于FeatureVectors布局的思考并且还[录制了视频](https://www.youtube.com/watch?v=jcpIrw38E-s)，强烈推荐！
+
+![Simon Clavet的回复](./UE5MotionMatchingPic/12.png)
 
 ## 下一步计划
-Mirroring Animation
+* Search函数中Group的Match似乎存在bug，发个pr问下
 
-FootLock(Foot Placement)
+* Mirroring Animation
 
-BlendSpace的使用
+* FootLock(Foot Placement)
 
-DynamicPlayRateSettings
+* BlendSpace的使用
 
-Debug工具
+* DynamicPlayRateSettings
 
-数据的标准化处理
+* Debug工具
 
-应用篇
+* 数据的标准化处理
+
+* 应用篇
 
 
 如果文章有错误，记得联系我~
