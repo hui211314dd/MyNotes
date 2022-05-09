@@ -1290,29 +1290,20 @@ TODO Control再看一遍Distance章节
 
 
 
-下周:
-概念理解：Channel, Weight, FeatureDesc, FeatureType, FeatureDomain,  Horizon 需要举例说明
 
-Group如何使用？
 
-PoseSearch:MotionMatching 文档
 
 Mirror原理(重点并且细致的剖析)，资料有MMDemo, ControlRig/Maya生成Mirror逻辑，PoseSearch等, MirrorTransform？, LU停步动画Mirrored后有位移，bug？
-Footlock
 
-
-
-
-
-
-
-
-
-Debug代码
-UPoseSearchSchema
-FDynamicPlayRateSettings
-FPoseSearchIndexPreprocessInfo
-Preprocess
+Search函数中Group的Match似乎存在bug，发个pr问下
+Mirroring Animation
+FootLock(Foot Placement)
+BlendSpace的使用
+DynamicPlayRateSettings
+Debug工具
+数据的标准化处理
+应用篇
+Group如何使用？
 修复MotionMatching Node填入DB后不生效的bug
 
 
