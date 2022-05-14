@@ -1296,7 +1296,6 @@ TODO Control再看一遍Distance章节
 Mirror原理(重点并且细致的剖析)，资料有MMDemo, ControlRig/Maya生成Mirror逻辑，PoseSearch等, MirrorTransform？, LU停步动画Mirrored后有位移，bug？
 
 Search函数中Group的Match似乎存在bug，发个pr问下
-Mirroring Animation
 FootLock(Foot Placement)
 BlendSpace的使用
 DynamicPlayRateSettings
