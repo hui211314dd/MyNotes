@@ -145,7 +145,7 @@ FMatrix R2 = FRotationMatrix::MakeFromYZ(Y, Z);
 Transform.SetRotation(FQuat(R2));
 ```
 
-MirrorQuat我们已经实现完毕了，我们有以下场景：存在两个Transform以及子物体左右脚，这两个Transform模拟的是角色绑定时的左右脚骨骼的Transform, 我们有右脚的动画，需要镜像生成左脚动画
+MirrorQuat我们已经实现完毕了，接下来我们要解决MirroringAnimation实际会遇到的问题。我们有以下场景：存在两个Transform以及子物体左右脚，这两个Transform模拟的是角色绑定时的左右脚骨骼的Transform, 我们有右脚的动画，需要镜像生成左脚动画
 
 ![左右脚绑定时状态](./UE5MirroringAnimationPic/5.png)
 
@@ -165,7 +165,7 @@ MirrorQuat我们已经实现完毕了，我们有以下场景：存在两个Tran
 
 哇，完全正确，只要我们要求美术同学绑定骨骼时完全按照这个规则就行了，收工！！！等等，貌似不太行，因为这里的Quat是ComponentSpace的，美术同学不可能每次都换算成ComponentSpace再Mirror，而且绑定时首要考虑的是Key动画方便，为了程序计算方便而让美术同学做出这么大的妥协是不现实也是绝不可能的！
 
-所以我们必须接受一个现实：**左右脚绑定时的Transform没有任何联系**，完全是美术同学怎么方便怎么来。
+所以我们必须接受一个现实：**左右脚绑定时的Transform可以没有任何联系**，完全是美术同学怎么方便怎么来。
 
 我们可以利用上面得到的结论进一步思考下，我们定义绑定时右脚的绑定Quat为$Q(RBind)$, 调用MirrorQuat后的为$Q(MirroredRBind)$, 左脚的绑定Quat为$Q(LBind)$, 当右脚每帧播放动画时右脚的当前Quat为$Q(RCurrent)$, $Q(RCurrent)$镜像后的结果为$Q(MirroredRCurrent)$, 我们需要求$Q(LCurrent)$, 我们思考下$Q(MirroredRBind)$, $Q(MirroredRCurrent)$, $Q(LBind)$, $Q(LCurrent)$有什么联系？ 我们知道$Q(MirroredRBind)$转换为$Q(MirroredRCurrent)$经历了一个中间的$Q(Delta)$, 这个$Q(Delta)$通过一个旋转轴$V$以及一个旋转角$\theta$完成了旋转，如果$Q(LBind)$也应用这个$Q(Delta)$会发生什么？它也进行了正确的旋转！我们找到了他们的关系
 
@@ -185,15 +185,41 @@ Q = TargetParentRefRotation.Inverse() * Q;
 
 {视频: 正确MirroringAnimation的结果}
 
+当源骨骼和镜像骨骼是同一个骨骼时，$Q(LCurrent) = Q(MirroredRCurrent)$，也是正确的，
 完美:)
 
 ## UE5中的常规使用
-[UE5 Mirroring Animation官方文档](https://docs.unrealengine.com/5.0/zh-CN/mirroring-animation-in-unreal-engine/)已经有例子说明了如何使用，我们下面主要讲下内部的实现细节
+[UE5 Mirroring Animation官方文档](https://docs.unrealengine.com/5.0/zh-CN/mirroring-animation-in-unreal-engine/)已经有例子说明了如何使用，我们下面主要讲下部分重要的实现细节
 
 ### MirrorDataTable
 
+ > _` ` Mirror Data Tables provide mirroring assignments and instructions for all the elements of a Skeleton you want to mirror._
+
+正如官方文档里面提到的, MirrorDataTable的最大作用就是提供信息，提供需要Mirror的信息，包括哪些骨骼对，哪些SkeletonNotify, 哪些SyncMarker等等，它只提供信息不负责逻辑。我们下面解释下MirrorDataTable中比较重要的几个函数
+
+**UMirrorDataTableFactory**: 创建MirrorDataTable前会弹出选择骨架的UI, UMirrorDataTableFactory类负责SlateUI和MirrorDataTable创建和初始化等等
+
+**FindReplaceMirroredNames**: UMirrorDataTableFactory创建好MirrorDataTable后会调用此函数，此函数主要做了四件事情:
+* 遍历绑定骨架中的所有骨骼，随之遍历所有的MirrorFindReplaceExpressions，看下能不能匹配到有效的镜像骨骼，如果能，则将相关信息添加到DataTable数据行中
+
+* 遍历所有的AnimationNotifies， 随之遍历所有的MirrorFindReplaceExpressions，看下能不能匹配到有效的镜像Notify，如果能，则将相关信息添加到DataTable数据行中。这里需要特别注意的是，**MirrorDataTable记录的是SkeletonNotify，而不是AnimNotify**，Notify相关的差别[官方文档](https://docs.unrealengine.com/5.0/zh-CN/animation-notifies-in-unreal-engine/)已经解释的很清楚了，所以说这里即使手动配置比如AnimNotify_PlaySound类型的AnimNotify也是不管用的，但并不是说AnimNotify没有办法镜像了，官方文档已经提到，可以通过IsTriggeredByMirroredAnimation可以判断出当前动画是否经历了镜像处理
+
+* 遍历绑定骨架中的所有AnimCurve，随之遍历所有的MirrorFindReplaceExpressions，看下能不能匹配到有效的镜像Curve，如果能，则将相关信息添加到DataTable数据行中
+
+* 调用FillMirrorArrays函数, 下面解释
+
+可以看到FindReplaceMirroredNames帮我们自动导入了很多数据，但是没有导入SyncMarker的数据，SyncMarker需要我们**手动输入**
+
+**FillMirrorArrays**: MirrorDataTable的数据行已经通过FindReplaceMirroredNames函数导入了，FillMirrorArrays函数帮我们把表格数据转换成代码存取方便的数据结构
+
+现在哪些骨骼, Curve以及SyncMarker需要做镜像以及跟谁做镜像的信息已经存储到MirrorDataTable中了, 只有数据还不行，需要有逻辑执行才可以，AnimNode_Mirror就是负责处理这些逻辑的
 
 ### AnimNode_Mirror
+整个FAnimNode_Mirror的内容其实很简单，核心逻辑集中在Update_AnyThread和Evaluate_AnyThread中，我们分别看下这两个函数都做了哪些工作
+
+* Update_AnyThread: 当发现Mirror状态发生变化时，向Inertialization Node发出一个请求, 所以官方文档要求MirrorNode后面一定要跟一个InertializationNode; 还有一个可选项为当Mirror状态发生改变时，Source是否需要Reinitialize,逻辑也是在这里判断的
+
+* Evaluate_AnyThread: 这里就是逻辑处理的地方了！分别根据配置调用了FAnimationRuntime::MirrorPose，FAnimationRuntime::MirrorCurves以及UE::Anim::Attributes::MirrorAttributes，MirrorPose的原理上面已经讲过了，MirrorCurves和MirrorAttributes的原理很简单，不再详细说了。(Attributes这里先挖个坑以后详细出一篇专门讲解Attributes的，[官方文档在这里](https://docs.unrealengine.com/5.0/zh-CN/fbx-attributes-in-unreal-engine/))
 
 ## PoseSearch中的应用
 
@@ -202,26 +228,30 @@ Q = TargetParentRefRotation.Inverse() * Q;
 ### AnimNode_MotionMatching
 
 ## Bonus
-* 四元数的资料
+* 我相信对于四元数原理以及应用一知半解的大有人在，这里强烈推荐[krasjet的四元数与三维旋转](https://krasjet.github.io/quaternion/quaternion.pdf)，我相信你看完后肯定会爱上这篇文档！
 
 * 在[Motion Matching 中的代码驱动移动和动画驱动移动](https://zhuanlan.zhihu.com/p/432663486)中，Daniel Holden同样也提供了Mirror的功能，不过并不是运行时的Mirroring Animation，而是在离线生成Mirroring Animation，[生成脚本在这里](https://github.com/orangeduck/Motion-Matching/blob/main/resources/generate_database.py)
 
 * 顽皮狗在[《最后生还者2》中的Motion Matching](https://zhuanlan.zhihu.com/p/403923793)中明确提到，虽然优点很突出，比如不占用内存就可以轻松动画库double, 但他们的主角很少使用Mirroring Animation，因为需要对称的Idle Pose，而且运动需要完美地对称; 而四足动画因为动捕本身就比较困难，所以使用Mirroring Animation能够弥补这一不足
 
 ## 下一步计划
-* FootLock(Foot Placement)
+* 多个MirrorNode是如何运行的，SyncMarker如何执行Mirror操作的，AnimNotify如何知道Mirror信息的等等，这涉及到很多知识点，包括FMirrorSyncScope, FAnimNotifyMirrorContext, SyncMarker, SyncGroup, IGraphMessage, FAnimNotifyEventReference等等，可以延伸的东西太多了，实在没有精力这本篇全部写完，后面再一一深挖吧
 
-* BlendSpace的使用
+* Animation Attributes
 
-* DynamicPlayRateSettings
+* MM FootLock(Foot Placement)
 
-* Debug工具
+* MM BlendSpace的使用
 
-* 数据的标准化处理
+* MM DynamicPlayRateSettings
+
+* MM Debug工具
+
+* MM 数据的标准化处理
 
 * 确认Search函数中Group的Match是否存在bug
 
-* 应用篇
+* MM 应用篇
 
 
 如果文章有错误，记得联系我~
