@@ -32,7 +32,7 @@ PoseSearch插件路径：UnrealEngine\Engine\Plugins\Experimental\Animation\Pose
 ## Mirroring Animation原理
 如果你没有接触过Mirroring Animation，你咋一听可能会觉得原理会很简单，位置和旋转直接镜像不得了嘛，比如下面这样:
 
-![哪里感觉怪怪的...](./UE5MirroringAnimationPic/1.png)
+![哪里感觉怪怪的...]()
 
 你可能已经看不来哪里不对劲了，上面一个是左手坐标系的位置，另一个是右手坐标系的位置，Mirroring Animation可不能这么干 :)
 
@@ -48,14 +48,14 @@ PoseSearch插件路径：UnrealEngine\Engine\Plugins\Experimental\Animation\Pose
 ### MirrorAxis/MirrorPlane
 进行Mirror前，我们需要知道要通过哪个镜像平面进行镜像操作，比如下图:
 
-![镜像轴或者镜像平面](./UE5MirroringAnimationPic/2.png)
+![镜像轴或者镜像平面]()
 
 上图表示我们需要通过X轴或者说YZ平面进行镜像操作
 
 ### Vector
 从下图可以看到，MirrorVector相当简单，如果是按照X轴镜像，那么直接将X的位置取反即可
 
-![MirrorVector](./UE5MirroringAnimationPic/3.png)
+![MirrorVector]()
 
 代码如下:
 ```C++
@@ -134,7 +134,7 @@ FQuat FAnimationRuntime::MirrorQuat(const FQuat& Q, EAxis::Type MirrorAxis)
 
 我们可以看下镜像前后的效果:
 
-![通过X轴镜像](./UE5MirroringAnimationPic/4.png)
+![通过X轴镜像]()
 
 可以看到我们按照X轴镜像的话，除了X轴没有镜像外，其他两个轴都镜像了，利用这个现象我们也可以使用下面这种方式:
 
@@ -147,7 +147,7 @@ Transform.SetRotation(FQuat(R2));
 
 MirrorQuat我们已经实现完毕了，接下来我们要解决MirroringAnimation实际会遇到的问题。我们有以下场景：存在两个Transform以及子物体左右脚，这两个Transform模拟的是角色绑定时的左右脚骨骼的Transform, 我们有右脚的动画，需要镜像生成左脚动画
 
-![左右脚绑定时状态](./UE5MirroringAnimationPic/5.png)
+![左右脚绑定时状态]()
 
 刚开始，我们可能会想直接拿到右脚的Quat调用MirrorQuat后赋值给左脚不就可以了吗，我们看下按照这个方法表现会是怎样的？(**演示工程是按照Y轴镜像生成的**)
 
@@ -157,7 +157,7 @@ MirrorQuat我们已经实现完毕了，接下来我们要解决MirroringAnimati
 
 我们首先需要想一个问题，当左脚绑定是什么样子的时候，我们可以直接拿MirrorQuat后的结果直接用呢？我们试试改下左脚绑定时的Transform, 把左脚绑定的Quat改成MirrorQuat(RightFootBindQuat)试试，即:
 
-![](./UE5MirroringAnimationPic/6.png)
+![]()
 
 然后还是按照上面的办法，每帧把右脚的Quat传入MirrorQuat做处理，把结果直接付给左脚，效果如下：
 
@@ -185,8 +185,7 @@ Q = TargetParentRefRotation.Inverse() * Q;
 
 {视频: 正确MirroringAnimation的结果}
 
-当源骨骼和镜像骨骼是同一个骨骼时，$Q(LCurrent) = Q(MirroredRCurrent)$，也是正确的，
-完美:)
+当源骨骼和镜像骨骼是同一个骨骼时，结果也是正确的，完美 :)
 
 ## UE5中的常规使用
 [UE5 Mirroring Animation官方文档](https://docs.unrealengine.com/5.0/zh-CN/mirroring-animation-in-unreal-engine/)已经有例子说明了如何使用，我们下面主要讲下部分重要的实现细节
@@ -225,10 +224,107 @@ Q = TargetParentRefRotation.Inverse() * Q;
 
 ### PoseSearchDatabase
 
+![Mirroring Mismatch Cost]()
+
+在上一篇[UE5中的MotionMatching(四) MotionMatching](https://zhuanlan.zhihu.com/p/507268359)中我们已经讲过了它的含义，默认情况下，如果当前播放的动画资源是原始动画资源(非镜像资源), 那么期望下一个动画帧也是原始动画资源，如果候选帧是镜像资源，需要在原来Cost的基础上额外增加一个Cost就是Mirroring Mismatch Cost，当然了，如果当前播放的动画资源是镜像资源，那么肯定也是期望下一个动画帧也是镜像资源，如果候选帧是原始资源，也需要额外增加Mirroring Mismatch Cost
+
+PoseSearchDatabase中还有一项配置项为MirrorOption：
+
+* Original Only: 仅仅生成源数据版本
+
+* Mirrored Only: 仅仅生成源数据对应的镜像版本
+
+* Original and Mirrored: 两个版本都生成
+
+![Mirror Option]()
+
+可以看到一个简单的配置项就可以完成数据库的double! 需要注意的是，选择了镜像版本并不是说引擎生成一份镜像的资源拷贝，而是可以运行时镜像动画
+
+关于代码实现的部分主要集中在下面这三个函数：
+
+```C++
+FIndexer::AddPoseFeatures(int32 SampleIdx)
+FIndexer::AddTrajectoryDistanceFeatures(int32 SampleIdx)
+FIndexer::AddTrajectoryTimeFeatures(int32 SampleIdx)
+```
+
+分别对应创建PoseFeatures以及TrajectoryFeatures，不难理解，当对镜像版本创建Features时，采样当然得使用镜像后的RootTransform和Pose了，AddPoseFeatures调用了MirrorTransform(我觉得这个函数名得改成MirrorRootTransform...)和MirrorPose，AddTrajectoryDistanceFeatures和AddTrajectoryTimeFeatures只调用了MirrorTransform
+
 ### AnimNode_MotionMatching
+那么是不是像InertializationNode一样，我们也需要在AnimNode_MotionMatching后面手动添加一个MirrorNode呢？不用的！AnimNode_MotionMatching内部保存了一个独立的MirrorNode，已经自动支持了Mirror功能！
+
+```C++
+	// Embedded sequence player node for playing animations from the motion matching database
+	FAnimNode_SequencePlayer_Standalone SequencePlayerNode;
+
+	// Embedded blendspace player node for playing blendspaces from the motion matching database
+	FAnimNode_BlendSpacePlayer_Standalone BlendSpacePlayerNode;
+
+	// Embedded mirror node to handle mirroring if the pose search results in a mirrored sequence
+	FAnimNode_Mirror_Standalone MirrorNode;
+
+	// Encapsulated motion matching algorithm and internal state
+	FMotionMatchingState MotionMatchingState;
+
+	// Current Asset Player Node
+	FAnimNode_AssetPlayerBase* CurrentAssetPlayerNode = &SequencePlayerNode;
+```
+
+MirrorNode分别在Initialize_AnyThread, UpdateAssetPlayer进行了调用, 代码很简单，不再解释了
+
+```C++
+void FAnimNode_MotionMatching::Initialize_AnyThread(const FAnimationInitializeContext& Context)
+{
+	//......
+
+	CurrentAssetPlayerNode = &SequencePlayerNode;
+
+	MirrorNode.SetSourceLinkNode(CurrentAssetPlayerNode);
+	if (Database && Database->Schema)
+	{
+		MirrorNode.SetMirrorDataTable(Database->Schema->MirrorDataTable.Get());
+	}
+
+	Source.SetLinkNode(&MirrorNode);
+	Source.Initialize(Context);
+}
+
+void FAnimNode_MotionMatching::UpdateAssetPlayer(const FAnimationUpdateContext& Context)
+{
+	//......
+
+	// Execute core motion matching algorithm and retain across frame state
+	UpdateMotionMatchingState(
+		Context,
+		Database,
+		bUseDatabaseTagQuery ? &DatabaseTagQuery : nullptr,
+		Trajectory,
+		Settings,
+		MotionMatchingState
+	);
+
+	if (MotionMatchingState.CurrentDatabase.IsValid() && MotionMatchingState.CurrentDatabase->Schema)
+	{
+		MirrorNode.SetMirrorDataTable(MotionMatchingState.CurrentDatabase->Schema->MirrorDataTable.Get());
+	}
+
+	const FPoseSearchIndexAsset* SearchIndexAsset = MotionMatchingState.GetCurrentSearchIndexAsset();
+
+	// If a new pose is requested, jump to the pose by updating the embedded sequence player node
+	if (SearchIndexAsset && (MotionMatchingState.Flags & EMotionMatchingFlags::JumpedToPose) == EMotionMatchingFlags::JumpedToPose)
+	{
+		//...
+
+		MirrorNode.SetSourceLinkNode(CurrentAssetPlayerNode);
+		MirrorNode.SetMirror(SearchIndexAsset->bMirrored);
+	}
+
+    //......
+}
+```
 
 ## Bonus
-* 我相信对于四元数原理以及应用一知半解的大有人在，这里强烈推荐[krasjet的四元数与三维旋转](https://krasjet.github.io/quaternion/quaternion.pdf)，我相信你看完后肯定会爱上这篇文档！
+* 我相信对于四元数原理以及应用一知半解的大有人在，这里强烈推荐[krasjet的《四元数与三维旋转》](https://krasjet.github.io/quaternion/quaternion.pdf)，我相信你看完后肯定会爱上这篇文档！
 
 * 在[Motion Matching 中的代码驱动移动和动画驱动移动](https://zhuanlan.zhihu.com/p/432663486)中，Daniel Holden同样也提供了Mirror的功能，不过并不是运行时的Mirroring Animation，而是在离线生成Mirroring Animation，[生成脚本在这里](https://github.com/orangeduck/Motion-Matching/blob/main/resources/generate_database.py)
 

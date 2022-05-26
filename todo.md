@@ -81,3 +81,10 @@ Maya新手课完结
 3. Mirror,Footlock以及MotionMatchingDemo分拆文档
 4. ALS以及PoseSearch看完
 5. 剖析RootMotion以及AnimNode各个函数含义
+
+
+
+
+
+各种指针:
+TObjectPtr
