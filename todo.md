@@ -81,3 +81,27 @@ Maya新手课完结
 3. Mirror,Footlock以及MotionMatchingDemo分拆文档
 4. ALS以及PoseSearch看完
 5. 剖析RootMotion以及AnimNode各个函数含义
+
+
+
+各种指针:
+
+TObjectPtr
+
+TSoftObjectPtr
+
+TWeakObjectPtr
+
+TSharedPtr
+
+
+虚幻引擎必知项:
+序列化与序列化，编辑器编辑与Runtime的关系
+反射系统以及UBT
+FProperty原理以及各个设置
+GC原理以及优化
+智能指针
+网络同步
+TaskGraph使用以及原理
+TickGroup使用以及原理
+Movement的同步以及原理
