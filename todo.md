@@ -52,9 +52,6 @@ PoseSearch的问题
 4. 如何调试？
 
 
-DeltaTransform.Inverse() * Transform * DeltaTransform; ？？
-
-
 明年计划：
 1. maya动画学习，没有什么前置知识，而且学完后可以自己做动画进行其他功能试验。
 2. 动画蓝图的实践，比如ALS这种系统，要经常实践，否则经常处于纸上谈兵的怪圈，无前置知识，需要文档总结, 很多基础系统的学习包括同步组，Pose Driver，AnimationLink等等
@@ -72,7 +69,6 @@ PoseSearch看完 PoseSearch系列完成MotionMatching, Weight调整
 微积分完结
 Maya新手课完结
 四元数完结
-
 
 
 
@@ -95,7 +91,12 @@ TWeakObjectPtr
 TSharedPtr
 
 
+
+
 虚幻引擎必知项:
+AnimNode relevant???
+AnimSubSystem ???
+
 序列化与序列化，编辑器编辑与Runtime的关系
 反射系统以及UBT
 FProperty原理以及各个设置
