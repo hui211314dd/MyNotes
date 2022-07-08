@@ -105,3 +105,10 @@ GC原理以及优化
 TaskGraph使用以及原理
 TickGroup使用以及原理
 Movement的同步以及原理
+
+
+4. CreateTickRecordForNode/SyncScope.AddTickRecord做了哪些事情以及流程？
+TODO Sync原理
+
+5. URO原理以及流程？
+TODO URO使用以及原理
