@@ -41,14 +41,36 @@ RewindDebugger
 通过UPoseSearchFeatureChannel_Trajectory::DebugDraw代码我们可以知道，绘制LinearVelocity时，向量的长度表示了速度的大小，而FacingDirection却始终是单位向量，所以可以得出结论，如果向量的长度等于圆球的半径大小那就是FacingDirection, 如果向量长度有长有短，那表示的就是LinearVelocity.
 
 
-
-DrawDebugString貌似在RewindDebugger中无效
-
-
-
 Cost[0]中的0表示ChannelIdx，指的是该Channel在Schema Channels中的索引值，对照着Schema的设置可以看到，Cost[0]指的是TrajectoryCost, Cost[1]指的是PoseCost
 
 
 ![](.\UE5MotionMatchingPracticePic/4.png)
 
 ![](.\UE5MotionMatchingPracticePic/5.png)
+
+
+当角色向后背方向起步转身行走时，我们通过RewindDebugger发现这时候选择动画出现了一些问题，理想情况应该是始终播放WalkFwdStartL180这个动画，但实际情况是播放了一段WalkFwdStartL180后又选择了WalkFwdStartL135的动画，我们在RewindDebugger将时间轴拖到发生跳转的那一刻，看下发生了什么。
+
+![](.\UE5MotionMatchingPracticePic/6.png)
+
+![](.\UE5MotionMatchingPracticePic/7.png)
+
+可以看到两者的Cost还是很近的（180L动画Cost为0.591, 135L动画Cost为0.507）180L吃亏在第三个Trajectory采样点的FaceDirection上(存疑，怀疑引擎存在bug，从上面的图上，180L应该是有优势的)，解决方案有多种
+
+* 调整Trajectory采样时间，每个采样时间点权重不同等;
+* 修改Schema中的ContinuingPoseCostBias，在[《最后生还者2》中的Motion Matching](https://zhuanlan.zhihu.com/p/403923793)中我们已经讲过了Bias的含义了, 我们这里设置为-0.1;
+* WalkFwdStart系列动画中添加PoseSearchBlockTransition NotifyState,将BeginTime设置为0.13，同时设置MotionMatching节点中的SearchThrottleTime属性值为0.15，这样一旦选择好转身动画后几乎不会再反复横跳了;
+
+{SpringDamper+参数调整+NotifyState后的起步效果.mp4}
+
+视频中有两个点可以说下
+* 运动方向与角色朝向分别是0，90，135，180的时候，分别选择了相应的动画并播放，符合我们的预期；
+* 特别有意思的是，我们提供的资源里面并没有Pivot相关的动画，但是视频后半部分角色在进行Pivot相关运动时，可以看到角色利用WalkStart动画展示出了Pivot效果，表现相当不错，也一点也展示出了MotionMatching系统的优势;
+
+
+建议：
+* DrawDebugString貌似在RewindDebugger中无效
+* FeatureVector 63各个含义？
+* Database Feature抖动？
+* FacingDirection 和 LinearVelocity可以用颜色区分下
+* Cost计算是否有bug，至今看不出为什么会选择135而不是180？
