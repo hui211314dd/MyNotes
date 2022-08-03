@@ -74,3 +74,5 @@ Cost[0]中的0表示ChannelIdx，指的是该Channel在Schema Channels中的索�
 * Database Feature抖动？
 * FacingDirection 和 LinearVelocity可以用颜色区分下
 * Cost计算是否有bug，至今看不出为什么会选择135而不是180？
+* 有Flag能够标识出当前是否正在查询
+* PoseDatabase中并不会表示BlockTranstion的标识
