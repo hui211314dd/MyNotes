@@ -76,3 +76,19 @@ Cost[0]中的0表示ChannelIdx，指的是该Channel在Schema Channels中的索�
 * Cost计算是否有bug，至今看不出为什么会选择135而不是180？
 * 有Flag能够标识出当前是否正在查询
 * PoseDatabase中并不会表示BlockTranstion的标识
+* Idle情况下没有考虑ErrorTolerance的情况
+* 性能问题
+* Steering和Clamping有什么计划呢
+
+
+你好，我使用了PoseSearch一段时间，期间发现了一些问题，希望能讨论下
+
+1. DrawDebugString貌似在RewindDebugger中无效，导致DrawBoneNames和DrawSampleLabels不可用，是已知问题吗？
+2. (配图) 每个索引指的是哪个Channel？ 是Position.X，还是FaceDirection.Y？ 是不是可以考虑用ToolTips来帮助开发者？
+3. (配视频)当我在Database拖动时间轴时，发现Feature会有抖动，我怀疑是插值导致的问题，这符合预期吗？
+4. (配图)建议FacingDirection和LinearVelocity可以用颜色区分下，有的时候很难区分
+5. (配图)不知道Cost计算是否有bug，目前看不出MotionMatching系统为什么会选择135的动画而不是180？
+6. 有没有考虑在MotionMatchingState中添加一个属性表示是否调用过Search函数
+7. PoseDatabase中并没有列属性表示BlockTranstion的标识，这会导致一个问题是某个Pose Cost最小但是不能跳转
+8. (配代码)Cost比较没有考虑ErrorTolerance的问题，导致一个问题是当角色静止不动时Pose也在跳转
+9. (配图)Steering和Clamping有什么计划呢

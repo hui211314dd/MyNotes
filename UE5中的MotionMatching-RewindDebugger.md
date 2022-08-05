@@ -48,10 +48,10 @@ PoseSearch插件路径：UnrealEngine\Engine\Plugins\Experimental\Animation\Pose
 
 ## 属性详情界面介绍
 ### A区域
-![DrawOptions](.\UE5MotionMatchingDebuggerPic\A-Region.png)
+![ActivePose](.\UE5MotionMatchingDebuggerPic\A-Region.png)
 ActivePose表示当前正在播放的那个动画，也可以理解成被MotionMatching选中的动画。有个特别特别重要的点，就是**MotionMatching不是每帧都执行的**，ActivePose是当前或者以前几帧的时候被MotionMatching系统选中并播放的，因此你经常看到，当前的ActivePose明明不是Cost最小的而偏偏被播放了，原因可能是它在前面因为Cost最小被选中播放了并且当前因为SearchThrottleTime的缘故没有Search。
 
-ActivePose页签内最多只能有一行动画数据，并且这一行数据可以被选中，当被选中时，可以看到编辑器视口内出现了这个PoseIdx所对于FeatureVector的调试信息，颜色为**绿色**(蓝色的为QueryFeatureVector的调试信息)
+ActivePose页签内最多只能有一行动画数据，并且这一行数据可以被选中，当被选中时，可以看到编辑器视口内出现了这个PoseIdx所对于FeatureVector的调试信息，颜色为**绿色**(蓝色的为QueryPoseVector的调试信息)
 
 ![当ActivePose被选中时显示的绿色调试信息](.\UE5MotionMatchingDebuggerPic\3.png)
 
@@ -68,27 +68,27 @@ ActivePose页签内最多只能有一行动画数据，并且这一行数据可�
 * PoseIndex: 采样Pose的编号
 
 ### B区域
-![DrawOptions](.\UE5MotionMatchingDebuggerPic\B-Region.png)
+![ContinuingPose](.\UE5MotionMatchingDebuggerPic\B-Region.png)
 ContinuingPose表示上一个ActivePose所在的动画如果继续播放下去，应该播放的那个PoseIdx。我们再次强调**MotionMatching不是每帧都执行的**，如果SearchThrottleTime设置的为1，那么表示1秒强制进行一次Search(其实表述不太准确，如果动画继续播放已经到动画末尾时也会强制Search)，那么本次Search后的1s时间内，MotionMatching是不会Search，我们假设本次Search的结果是A动画PoseIdx为10的动画帧，那么在接下来的1s内会播放A动画PoseIdx为11，12，13，14，15的动画直到1s后的Search，1s后再次Search的结果是B动画PoseIdx为80的动画帧，那么A区域的ActivePose会显示B动画PoseIdx为80的信息，而B区域的ContinuingPose会显示A动画PoseIdx为16的动画，这样会很直观的看出，为什么不再继续播放A动画了，特别方便进行比较。要知道，使用MotionMatching时会出现大量的类似场景“刚才为什么跳转动画了呢，应该继续播放原来的动画才对呀”
 
-ContinuingPose页签内最多只能有一行动画数据，并且这一行数据可以被选中，当被选中时，可以看到编辑器视口内出现了这个PoseIdx所对于FeatureVector的调试信息，颜色为**灰色**(蓝色的为QueryFeatureVector的调试信息)
+ContinuingPose页签内最多只能有一行动画数据，并且这一行数据可以被选中，当被选中时，可以看到编辑器视口内出现了这个PoseIdx所对于FeatureVector的调试信息，颜色为**灰色**(蓝色的为QueryPoseVector的调试信息)
 
 ![当ContinuingPose被选中时显示的灰色调试信息](.\UE5MotionMatchingDebuggerPic\4.png)
 
 ### C区域
-![DrawOptions](.\UE5MotionMatchingDebuggerPic\C-Region.png)
+![PoseDatabase](.\UE5MotionMatchingDebuggerPic\C-Region.png)
 PoseDatabase显示了所有的候选Pose，当然也包括上面所说的ActivePose以及ContinuingPose，从这里也看到ActivePose是如何战胜其他候选人而成为天之骄子的。
 
 ![百里挑一](.\UE5MotionMatchingDebuggerPic\5.jpeg)
 
 有个需要注意的点是，可能在实践中发现明明某个Pose的Cost最低但是并没有被选中，是不是有黑幕什么的，其实并不是，有些Pose有可能在AnimSequence中被标记了BlockTransition(通过PoseSearchingNotifyState_BlockTransition), 表示该Pose不允许被跳转，只不过属性界面里没有被标识出来而已。
 
-PoseDatabase页签内有众多Pose数据，但最多只能有一行动画数据可以被选中，当被选中时，可以看到编辑器视口内出现了这个PoseIdx所对于FeatureVector的调试信息，颜色为**红色**(蓝色的为QueryFeatureVector的调试信息)
+PoseDatabase页签内有众多Pose数据，但最多只能有一行动画数据可以被选中，当被选中时，可以看到编辑器视口内出现了这个PoseIdx所对于FeatureVector的调试信息，颜色为**红色**(蓝色的为QueryPoseVector的调试信息)
 
 ![当PoseDatabase某项被选中时显示的红色调试信息](.\UE5MotionMatchingDebuggerPic\6.png)
 
 ### D区域
-![DrawOptions](.\UE5MotionMatchingDebuggerPic\D-Region.png)
+![MotionMatchingState](.\UE5MotionMatchingDebuggerPic\D-Region.png)
 通过名字可以猜到，MotionMatchingState显示的是MotionMatching内部的一些状态信息.
 
 * CurrentDatabase: 当前所使用的Database。 MotionMatching支持动态更换Database;
@@ -104,7 +104,7 @@ PoseDatabase页签内有众多Pose数据，但最多只能有一行动画数据�
 
 ### E区域
 ![DrawOptions](.\UE5MotionMatchingDebuggerPic\E-Region.png)
-DrawOptions主要负责编辑器视口中的调试信息绘制，Query页签下的负责QueryFeatureVector的绘制，SelectedPose负责选中Pose的FeatureVector的绘制
+DrawOptions主要负责编辑器视口中的调试信息绘制，Query页签下的负责QueryPoseVector的绘制，SelectedPose负责选中Pose的FeatureVector的绘制
 
 * Disable: 下面三个控制选项都禁用
 * DrawBoneNames: 绘制骨骼名称，但由于DrawDebugString的实现原因，目前DrawBoneNames在RewindDebugger暂不可用
@@ -116,13 +116,52 @@ DrawOptions主要负责编辑器视口中的调试信息绘制，Query页签下�
 我自己使用过程中一般会关闭DrawActiveSkeleton和DrawSelectedSkeletion，这样视口会清爽很多
 
 ### F区域
-![DrawOptions](.\UE5MotionMatchingDebuggerPic\F-Region.png)
+![PoseVectors](.\UE5MotionMatchingDebuggerPic\F-Region.png)
+“凭什么MotionMatching选择A动画而不是B动画，B动画在计算Cost时哪方面吃亏了？”，当你有这方面疑问时，PoseVectors提供的信息能帮助我们找到答案。
+
+* QueryPoseVector: 向MotionMatching申请Search时传入的QueryVector, 数据为归一化前的数据，比如位置为(10, 30, 0)等，数组的数量等于所有Feature的数量，依赖于Schema Channels的设置;
+* ActivePoseVector: 当前ActivePose的PoseVector, 数据为归一化前的数据，数量与QueryPoseVector相等;
+* SelectedPoseVector: 当PoseDatabase中有Pose被选中时，SelectedPoseVector显示的是选中Pose的PoseVector，数据为归一化前的数据，数量与QueryPoseVector相等;
+* CostVector: 当PoseDatabase中有Pose被选中时，CostVector显示的是选中PoseCost的详细，数量与QueryPoseVector相等;
+* CostVectorDifference: SelectedPoseCost与ActivePoseCost的差，数量与QueryPoseVector相等。当数值为负值时，说明SelectedPoseCost更小，更占优，如果为正值，说明SelectedPoseCost更大，具有劣势。可以看到该属性在解决上面那个问题时特别有用;
+
+### G区域
+![Misc](.\UE5MotionMatchingDebuggerPic\G-Region.png)
+* PlaySelectedAsset: 在编辑器视口播放在PoseDatabase选中的动画
+* AssetPlayRate: 设置动画播放时的速率
 
 ## 举例
+{RewindDebugger在使用MotionMatching时的演示.mp4}
+
+我们发现在静止状态下，角色似乎一直在跳转动画，导致角色动画不流畅，我们期望的结果是静止状态下角色一直在Idle动画上循环播放，我们通过RewindDebugger录制并回放发现，角色每1.5s会发生一次跳转，而我们的SearchThrottleTime设置的就是1.5s，所以结论是只要Search就会跳转。我们查看按帧步进发现在发生跳转的那一刻，ContinuingPose应该是193，并且Cost为0，而ActivePose变成了325，Cost也为0，因此原因如下：因为SearchThrottleTime为1.5s的缘故，MotionMatching系统每1.5s调用一次Search并且进行比较，发现所有的Cost都相同，所以就找到了一个存储位置靠后的Pose作为最佳结果返回并跳转(其实引擎代码有bug，在进行float比较时没有考虑ErrorTolerance，导致比较出现了错误)，那么如何解决呢？ 我们在[《最后生还者2》中的MotionMatching](https://zhuanlan.zhihu.com/p/403923793)看到过Bias相关的设置，幸运的是，PoseSearch也添加了相关的设置，我们将ContinuingPoseCostBias设置成-0.12就可以了~
 
 ## 注意事项和不足
+不同的FeatureChannel的绘制代码在UPoseSearchFeatureChannel::DebugDraw中实现，需要特别注意的是，绘制Trajectory时，LinearVelocity和FacingDirection很难区别，因为使用的是同一种颜色并且有些时候两个方向的长度还是等长的...
+
+![](.\UE5MotionMatchingPracticePic/3.png)
+
+通过UPoseSearchFeatureChannel_Trajectory::DebugDraw代码我们可以知道，绘制LinearVelocity时，向量的长度表示了速度的大小，而FacingDirection却始终是单位向量，所以可以得出结论，如果向量的长度等于圆球的半径大小那就是FacingDirection, 如果向量长度有长有短，那表示的就是LinearVelocity.
+
+虽说RewindDebugger表现已经相当不错了，但仍然有些地方可以改进的：
+* DrawDebugString貌似在RewindDebugger中无效，导致DrawBoneNames和DrawSampleLabels不可用;
+* F区域中虽说列出了哪些Cost大哪些小，没有直接指出是Position还是Rotation还是Direction，需要自己算;
+* FacingDirection和LinearVelocity使用同种颜色，无法很直观的区分;
+* 前面反复提到过，**MotionMatching不是每帧都执行的**, 但目前没有Flag能够标识出当前是否执行过Search;
+* PoseDatabase中没有BlockTranstion的标识列，导致有可能该PoseCost最小，但不会被选中，令开发者疑惑;
+* 性能问题，拖动时间轴的情况下Details界面反应会比较慢;
 
 ## Bonus
-其他大厂Debugger工具比较
+前言中已经说过，Debug工具是MotionMatching核心的功能之一，直接会影响MotionMatching的开发效率，所以各个大厂对于debug工具都特别重视，下面视频列出了Naughty Dog(顽皮狗)和Remedy(绿美迪娱乐)所开发的调试工具，仅供参考
+
 
 ## 下一步计划
+
+* MM中的BlendSpace
+
+* MM FootLock(FootPlacement)
+
+* MM DynamicPlayRateSettings
+
+* MM 数据的标准化处理
+  
+* MM应用篇
