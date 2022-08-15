@@ -67,6 +67,29 @@ Cost[0]中的0表示ChannelIdx，指的是该Channel在Schema Channels中的索�
 * 运动方向与角色朝向分别是0，90，135，180的时候，分别选择了相应的动画并播放，符合我们的预期；
 * 特别有意思的是，我们提供的资源里面并没有Pivot相关的动画，但是视频后半部分角色在进行Pivot相关运动时，可以看到角色利用WalkStart动画展示出了Pivot效果，表现相当不错，也一点也展示出了MotionMatching系统的优势;
 
+添加停步动画时刚开始想法是使用一个WalkFwdStop_RU, 通过配置OriginalAndMirrored来生成左脚的动画，但运行时发现有问题，因为没有配套的Idle动画导致最后出现了旋转的问题，所以没有采用镜像来生成而是提供了两个停步动画WalkFwdStop_LU和WalkFwdStop_RU
+
+{RightUpFoot镜像生成的LeftUpFoot在融合Idle会出现旋转的问题.mp4}
+
+当我们选择停步时两脚的情况是不确定，MotionMatching给出的结果可能是WalkFwdStop_LU 0.8s开始播放，但是我们Movement停步计算出的时间几乎每次都是相同的，这将导致WalkStop动画的脚已经站定了但Movement还在移动或者相反的情况，如果是DataDriven还好，但CodeDriven会经常出现这种情况，导致滑步的问题，除了IK解决以外也可以考虑添加更多种类型的WalkStop动画(像《FF7重制版》做的那样)，但特别注意的是，如果不是配套的动画资源直接拿过来使用的话，会导致很多问题，比如下面视频里看到的，Idle不一致，这是个很严重的问题，CorePose始终应该是确定且唯一的
+
+{随意找来的动画资源导致CorePose不一致.mp4}
+
+
+
+
+
+
+
+CollectGroupIndices计算Group是否存在问题？通过Group过滤Pose可以正常运行吗？没有问题，匹配时调用GetSourceAssetGroupTags直接拿到FPoseSearchDatabaseSequence，然后使用其中的GroupTags
+
+使用MotionMatching需要面对的核心问题：
+1. 动画数据需要RootMotion数据，在大量动捕数据(无根骨骼信息)的前提下，如何快速生成相对准确的RootMotion?
+2. 动画师需要按照什么标准修改根骨骼数据以匹配Gameplay的需要，是自动化检测工具提醒还是其他?
+3. CorePose要保持一致，比如Idle的状态，这时候动画师和技术需要定义好各种类型的CorePose，动捕数据需要大量粘贴CorePose
+4. 虚幻资源分析工具或者Maya插件，对动画资源分析从而指导如何设置Movement参数或者反过来从Movement指导动画资源应如何调整，双向都支持的工具
+
+
 
 建议：
 * DrawDebugString貌似在RewindDebugger中无效

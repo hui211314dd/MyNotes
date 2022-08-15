@@ -61,15 +61,12 @@ PoseSearch的问题
 6. UE5 nes插件 base SimpleNES
 
 
-
-
 4月目标:
 PoseSearch看完 PoseSearch系列完成MotionMatching, Weight调整
 
 微积分完结
 Maya新手课完结
 四元数完结
-
 
 
 1. PoseMatching文档（完成！）
@@ -107,13 +104,19 @@ TaskGraph使用以及原理
 TickGroup使用以及原理
 Movement的同步以及原理
 
-
 TraceLog/UE_TRACE_LOG 配合PoseSearch RewindDebugger
-
-
 
 4. CreateTickRecordForNode/SyncScope.AddTickRecord做了哪些事情以及流程？
 TODO Sync原理
 
 5. URO原理以及流程？
 TODO URO使用以及原理
+
+
+
+
+
+周五：
+解析NodeLayout
+
+1. FeaturePosition是什么
