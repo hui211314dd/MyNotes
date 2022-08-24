@@ -116,7 +116,11 @@ TODO URO使用以及原理
 
 
 
-周五：
+8月底要做的工作：
+1. 断线重连工程以及PPT
+2. 正常功能开发
+3. MotionMatching两个计划同时进行：Strafe/Turning等功能同步开发，以及Maya动画编辑，Python, Maya脚本等
+
 解析NodeLayout
 
 1. FeaturePosition是什么
