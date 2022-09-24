@@ -125,6 +125,68 @@ Dan Lowe目前在圣莫尼卡工作室，专注于《战神:诸神黄昏》的�
 
 接下来我们看另外一个例子，一个角色从跑步状态到停下来...
 
+{角色跑步到停下来存在滑步问题.mp4}
+
+首先要在动画的开头Key一个Zero，这样就能保持我们的跑步姿势，然后在动画的结束部分粘贴一个consistent pose。随后游戏相关人员过来告诉我们希望停步距离保持在3m左右，我们切到动画开头，把位置拖动到相应位置并Key帧，播放后发现不仅仅脚在滑步，当角色站定时Hips也在滑动。
+
+我们再试试Adjustment Blending tool...
+
+{自动化工具自动调整停步动画.mp4}
+
+它解决了所有的滑步问题，我们现在得到了一个很棒的停步动画！这其中发生了什么呢？
+
+![停步时发生了什么](.\TheAnimateButtonPic/14.png)
+
+**我们想的是当动画处于运动状态时我们悄无声息地进行adjustment, 当角色静止时不做任何adjustment**, 例如下图中脚站定时，无需adjustment
+
+![脚站定时无需adjustment](.\TheAnimateButtonPic/15.png)
+
+接下来的讨论会涉及到一些数学知识，不过放心，都是很简单的，做这些讨论是为了你们可以在自己的项目中独立实现。即使没有听懂也不用担心，后面我会把相关算法放到网上。
+
+正如前面所说，我们需要找出角色是在哪些区间移动的，对于base layer中的每个curve,我们计算每帧之间的改变量(注: 绝对值)...
+
+![每帧之间的改变量](.\TheAnimateButtonPic/16.png)
+
+然后将这些改变量相加求和：
+
+![改变量求和](.\TheAnimateButtonPic/17.png)
+
+随之将每帧的改变量通过Total变换成百分比数据
+
+![改变量变换为百分比数据](.\TheAnimateButtonPic/18.png)
+
+然后我们把这些百分比数据映射到Curve上，这条Curve长下面这个样子...
+
+![百分比数据映射成Curve](.\TheAnimateButtonPic/19.png)
+
+我们称这条Curve为Motion Delta, 通过它我们可以轻易看出哪里角色在移动，程度如何，以及哪里在静止，比如陡峭的地方表明在运动，平坦的地方表明在静止。
+
+(注：还记得最开始我们创建了一个单独的Layer并且在该Layer进行了Key值吗？下图就是新建Layer的Curve)
+
+![修正前的Curve](.\TheAnimateButtonPic/20.png)
+
+然后在新增的Layer上，我们进行修改，只需保证帧之间的百分比与上面求出的百分比相同即可，自动计算并调整后得到如下的结果:
+
+![修正后的Curve](.\TheAnimateButtonPic/21.png)
+
+这样就已经完成了！然后我们再对其他Curves重复同样的过程。我们通过比较图直观看下修正前后的比较，可以发现通过修正只有当角色运动时Curve数值才会有变化。
+
+![修正前后的比较](.\TheAnimateButtonPic/22.png)
+
+这个方法相当棒，因为只对Curves做一些数学的操作，所以可以很方便地移植到其他DCC工具中，同时也可以在game runtime中实现，我们稍后再聊这个话题。
+
+![可以移植到其他DCCs中](.\TheAnimateButtonPic/23.png)
+
+我刚才所描述的这种方法目前运行得很好，但肯定也有一些的问题和局限性...
+
+### Hyper Extension
+
+![腿部过度伸展](.\TheAnimateButtonPic/24.png)
+
+任何过大的调整都会导致四肢过度伸展, 显然人类的步幅是有限制的，如何解决呢？
+
+### 
+
 ## Automation tools
 
 ## 我的总结
@@ -136,6 +198,10 @@ Dan Lowe目前在圣莫尼卡工作室，专注于《战神:诸神黄昏》的�
 https://zhuanlan.zhihu.com/p/34260822
 
 https://zhuanlan.zhihu.com/p/34330297
+
+DeltaCorrection
+
+MotionWarping
 
 ## 不明白的点
 * Layer原理
@@ -163,3 +229,7 @@ proportion
 disparities
 reiterate
 compensated
+definitely
+be aware of
+Hyper
+detect
