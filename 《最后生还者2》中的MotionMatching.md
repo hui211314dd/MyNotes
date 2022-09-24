@@ -103,6 +103,13 @@ Locomotion应该是个什么样子呢？我们对主角的动画提出了如下�
  
 ![mm](TLOU2Pic/9.png)
 
+
+* lifting COM Pos指的是什么---（Center Of Mass）
+* SetRangeEnd时提到the time of future MotionModel trajectory干啥？ --- 没有说，应该是说留出FutureTrajectory的时间
+* 180r = 257DPS---（5846-5825 /30fps = 0.7s 180/0.7 = 257.14DPS）
+* 编辑的时候旋转的是什么骨骼或者控制器？ --- 应该是Align的方向，而且旋转Align并没有改变动画数据的偏移
+* 绿色的方向箭头是根据MotionModel SpringDamper参数生成的吗？ --- 无法确定，可以确定的是旋转是按照固定速率来的
+
 (Maya中如何操作来满足上面提到的所有的点呢，介绍了Maksym在maya开发的工具，包括曲线数据平滑，修改Transition动画能够与Loop动画完美贴合，其他没有搞明白*_*，后续明白后再加上吧。)
 
 上图说下主角的动画数据统计。  
