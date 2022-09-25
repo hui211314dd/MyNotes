@@ -183,9 +183,21 @@ Dan Lowe目前在圣莫尼卡工作室，专注于《战神:诸神黄昏》的�
 
 ![腿部过度伸展](.\TheAnimateButtonPic/24.png)
 
-任何过大的调整都会导致四肢过度伸展, 显然人类的步幅是有限制的，如何解决呢？
+任何过大的调整都会导致四肢过度伸展, 显然人类的步幅是有限制的，如何解决呢？ 首先我们必须查明在哪些帧上有过度拉伸的问题，这是很容易做到的，因为我们知道我们的四肢应该有多长
 
-### 
+![腿部伸展长度](.\TheAnimateButtonPic/25.png)
+
+然后我们在两个脚踝之间找到一个点，这个点的位置取决于我们每条腿有多少过度拉伸。因此如果我们一条腿有大量的拉伸，而另一条腿没有拉伸，那么这个点将更靠近有大量拉伸的那条腿的脚踝，我们将Hips向该点移动，直到我们得到满意的结果。
+
+![调整Hips解决拉伸问题](.\TheAnimateButtonPic/26.png)
+
+下面这张图展示了调整前后的比较:
+
+![拉伸问题前后的比较](.\TheAnimateButtonPic/27.png)
+
+### Apply to IK effectors for locked contacts
+
+
 
 ## Automation tools
 
@@ -233,3 +245,4 @@ definitely
 be aware of
 Hyper
 detect
+be supposed to be
