@@ -143,7 +143,7 @@ Dan Lowe目前在圣莫尼卡工作室，专注于《战神:诸神黄昏》的�
 
 接下来的讨论会涉及到一些数学知识，不过放心，都是很简单的，做这些讨论是为了你们可以在自己的项目中独立实现。即使没有听懂也不用担心，后面我会把相关算法放到网上。
 
-正如前面所说，我们需要找出角色是在哪些区间移动的，对于base layer中的每个curve,我们计算每帧之间的改变量(注: 绝对值)...
+正如前面所说，我们需要找出角色是在哪些区间移动的，对于BaseLayer中的每个curve,我们计算每帧之间的改变量(注: 绝对值)...
 
 ![每帧之间的改变量](.\TheAnimateButtonPic/16.png)
 
@@ -197,6 +197,20 @@ Dan Lowe目前在圣莫尼卡工作室，专注于《战神:诸神黄昏》的�
 
 ### Apply to IK effectors for locked contacts
 
+Adjustment Blending需要注意的第二个问题是为了获得锁定的触点，你需要将这个过程应用于你的IK Effectors。因为我们在MotionBuilder中工作并且其提供了FullBodyIK Rig, 所以我们不用关心这一点，但如果你想在其他DCC或者Runtime上实现，怎必须考虑这一点。
+
+![MotionBuilder中的FullBodyIK Rig](.\TheAnimateButtonPic/28.png)
+
+### Best when adjusting existing motion
+
+最后一点要注意的是: Adjustment Blending最好是调整BaseLayer中已经存在的动作而不是在动画中添加大量的额外动作, 举例来说我们有一个站立Idle的动画，现在想在AdditiveLayer上Key一个点击按钮的动画
+
+![Idle动画修改成PushButton动画](.\TheAnimateButtonPic/29.png)
+
+由于我们AdditiveLayer上的按钮动作比我们BaseLayer上的Idle大得多，Adjustment Blending将很难找到陡峭的曲线来隐藏按钮的运动。它最终给出了这个非常糟糕，抽搐且断断续续的运动，如下面视频演示的那样：
+
+{PushButton断断续续.mp4}
+
 
 
 ## Automation tools
@@ -246,3 +260,5 @@ be aware of
 Hyper
 detect
 be supposed to be
+subtle
+steep
