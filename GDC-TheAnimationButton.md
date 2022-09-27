@@ -235,7 +235,6 @@ MotionWarping
 * Layer原理
 * Adjustment Blending核心算法
 * MotionBuilder FullBodyIK在Adjustment Blending中充当的作用
-* Best when adjusting existing motion什么意思，后面提到的比较amount怎么理解和操作？
 
 # 单词
 ridiculous  

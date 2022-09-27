@@ -165,4 +165,89 @@ M表示是否影像，G表示Y轴方向是否启用重力
 ![路径动画2](./LearnMotionBuilderPic/21.png)
 
 # HumanIK
+TODO IK/FK
 
+# Actor
+光学动捕文件为c3d文件，记录了Marker的位置信息，需要匹配到Actor身上进行周转
+
+![Actor作为一个桥梁](./LearnMotionBuilderPic/22.png)
+
+操作步骤分为以下几个步骤：
+
+* Marker对齐位置，匹配到Actor身上
+
+![Marker对齐](./LearnMotionBuilderPic/23.png)
+
+* 创建MarkerSet并且一一指定，一个部位上最多可选4个Marker
+
+![Marker指定](./LearnMotionBuilderPic/24.png)
+
+* 最后进行确认
+
+![Marker确认](./LearnMotionBuilderPic/25.png)
+
+完成之后就可以通过HumanIK进行重定向了
+
+# BVH的使用
+
+如下步骤
+
+1. 导入BVH，所有Rotation进行Zero处理，将坐标中的X和Z设置为0，胳膊旋转到水平位置，然后将这个TPose单独保存成一个fbx, 记得不保存动画信息
+
+![TPose](./LearnMotionBuilderPic/26.png)
+
+2. 重新打开刚才保存的TPose文件，打开后点击HumanIK中的Skeleton，并重命名，随后指定骨骼信息
+
+![定义好Character](./LearnMotionBuilderPic/27.png)
+
+3. 点击HumanIK中的小锁，并且选择Biped，再次保存，随后就可以直接导入进来BVH动画了
+
+# Character定义的预设
+
+![Character定义预设](./LearnMotionBuilderPic/28.png)
+
+比如我导入一个UE4小白人的角色，第一次我需要手动定义Character, 需要手动指定骨骼的对应关系，但我不希望每次使用类似骨骼层级的时候都要手动定义，这时候可以把定义好的对应关系保存成一个xml文件，下次再需要定义的时候直接Load进来即可。MotionBuilder默认定义好一些预设，比如3dMax/Maya中常见的CAT和Biped等。
+
+# 角色控制器
+**一般是在控制器上Key动画的，而不是直接操纵骨骼**
+
+根据上面的步骤，定义好Character之后才可以创建ControlRig
+
+![创建好ControlRig](./LearnMotionBuilderPic/29.png)
+
+在X-Ray模式下可以看到，红色球状的是IK-Effector, 黄色线状的是FK-Effector，两者都是Effectors, 也重要让我明白Character Selection/Key Controls中的Effectors是代表Select/Key所有Effectors的意思......
+
+![代表所有Effectors](./LearnMotionBuilderPic/30.png)
+
+接下来我们看下ControlRig中众多控件的含义:
+
+![ControlRig中很多控件](./LearnMotionBuilderPic/31.png)
+
+1. X-Ray模式中是否显示IK-Effectors
+2. X-Ray模式中是否显示FK-Effectors
+3. X-Ray模式中是否显示Skeletons
+4. 操纵四个模式之一，是否是FullBodyIK模式，比如拖动手部IK时会影响全身，Key值时也是全身的Effectors
+5. 操纵四个模式之一，BodyPart，即拖动手部IK不会影响全身，但Key值时依然是全身的Effectors
+6. 操纵四个模式之一，真正意义上的BodyPart，Key值时只是身体局部的Effectors
+7. 操纵四个模式之一，只对Selection有效果
+8. 位置图钉约束，**代表着其他Effector不会影响到它，不代表着不会移动了，如果移动该Effector然后会移动**
+9. 旋转图钉约束，同上
+10. 设置为TPose状态
+
+# 地板影响
+1. UnlockCharacter
+2. 找到Character Definition,设置Floor
+
+![设置Floor信息](./LearnMotionBuilderPic/32.png)
+
+3. LockCharacter
+4. 设置Character Settings
+
+![设置Character Settings](./LearnMotionBuilderPic/33.png)
+
+5. 再将Source切到ControlRig就可以看到效果了
+
+![地板效果](./LearnMotionBuilderPic/34.png)
+
+# 原地动画
+Character Settings中有In-Place的设置，比如LockY
