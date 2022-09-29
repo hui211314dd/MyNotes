@@ -215,7 +215,101 @@ Adjustment Blending需要注意的第二个问题是为了获得锁定的触点�
 
 (由于视频数量限制，下篇再介绍Adjustment Blending以及Automation Tools)
 
+## Adjustmeng Blending At Runtime
+
+我之前提到过，我们同样可以在Runtime时做这个，现在还处在比较早期的阶段，所以我想谈谈它潜在的用途。
+
+我们现在假设游戏中的角色跑步然后停下来，那么角色经历的动画分别是Run, Stop以及Idle, 就是这么简单的逻辑就会碰到许多挑战...
+
+![Run-Stop-Idle](.\TheAnimateButtonPic/31.png)
+
+首先我们必须保证动画接缝处poses match...
+
+![接缝处动画帧要一致](.\TheAnimateButtonPic/32.png)
+
+我们也不知道当角色得到停止的信号时我们正将处于什么姿势，所以我们通常会在这个时候看到一些混合的问题
+
+![没有人能知道玩家想在什么时候停下来](.\TheAnimateButtonPic/33.png)
+
+再有，如果角色是AI，我们经常希望我们的AI能够准确停在寻路路径的末端点上，因此我们通常要做一些距离或转弯的修正，这就造成了滑步，这是我们不希望的。
+
+![为了精准控制位置在Stop时不得不实时修正](.\TheAnimateButtonPic/34.png)
+
+Adjustment Blending如何处理这个问题呢？我们知道角色打算停步时那一帧的动画，把该帧动画提取出来.
+
+![从Run动画中提取帧](.\TheAnimateButtonPic/35.png)
+
+我们再看一下我们将要融入的Idle Pose，我们同样也提取这个姿势
+
+![从Idle动画中也提取帧](.\TheAnimateButtonPic/36.png)
+
+然后在Runtime时，我们使用Adjustment Blending算法生成一个Additive Layered动画，然后在Stop上播放，它可以修正姿势...特别棒的主意！
+
+![Runtime使用Adjustment Blending的原理](.\TheAnimateButtonPic/37.png)
+
+使用Adjustment Blending算法的好处是Idle Pose是被提取出来的，所以我们不再需要在所有的基础数据中都有一个一致的Idle Pose
+
+![不需要专门的Core/Consistent Idle Pose了](.\TheAnimateButtonPic/38.png)
+
+因此我们可以有一堆不同的Idle Animations，当准备停步时可以从中随机一个，一旦选择好StartTime后，Adjustment Blending会帮我们处理好后面的工作
+
+![可以很自然地停到不同的Idle动画上](.\TheAnimateButtonPic/39.png)
+
+正如下面的视频里看到的，5个角色停步时分别过渡到不同的Idle Pose上，看起来特别自然，没有任何滑步。所有的角色使用了相同的Stop动画，Adjustment Blending将他们推向了不同的Idle上。
+
+{5个角色停步到不同的IdlePose上.mp4}
+
+我们甚至可以在Blend之前改变IdlePose在世界坐标的位置和旋转，我们可以得到一定程度的距离修正和旋转修正
+
+![可以重新改变IdlePose在世界坐标的位置](.\TheAnimateButtonPic/40.png)
+
+下面这个视频展示了5个角色停步到了不同朝向的位置，表现很自然，同样没有滑步。所有角色使用了相同的Stop动画
+
+{5个角色停步到不同朝向位置的IdlePose上.mp4}
+
+这让我想到通常情况下，我们的角色是通过播放这些短动画来移动的，动画片段之所以尽可能短是因为我们的系统需要动态变化。但是如果你有非常好的修正比如Adjustment Blending给予的那样，那么对于AI来说，如果我们提前知道AI角色要去哪个地方，实际上可以始终保持在同一个动画中，然后使用Adjustment Blending来动态修正
+
+所以我的意思是，我们可以使用长动画来代替短动画，Adjustment Blending修正使之成为可能
+
+![使用长动画来代替短动画](.\TheAnimateButtonPic/41.png)
+
+我们可以看下面这个视频，视频中的角色从一个掩体移动到另一个掩体附近，这是个几乎没有修改过的长动画，而且整个运动特别流畅，合理的加减速以及跟环境正确的交互
+
+{从一个掩体移动到另一个掩体的动捕长动画.mp4}
+
+但是，如果要放入游戏内的话，通常的做法是将这个长动画切成若干个短动画，比如掩护退出动画，然后进入标准的locomotion，最后还有一个掩护进入(Entry)动画
+
+![将长动画切成3个短动画-42](.\TheAnimateButtonPic/42.png)
+
+我们通过下面的视频看下实际的效果，可以看到效果有些差强人意，标准的locomotion放在这里并不合适，而且在融合时不仅有些生硬，而且在进入掩护状态时为了修正位置出现了滑步的问题
+
+{标准做法导致生硬且滑步的问题.mp4}
+
+我们再回过头来看我们的动捕动画，这明显才是我们想要的效果呀...只不过当目标掩护位置发生改变的时候，动画就不准确了...
+
+![实际期望位置经常与动画实际位置不同-43](.\TheAnimateButtonPic/43.png)
+
+就像之前我们做的那样，把目标位置拉到期望位置后，运行Adjustment Blending。通过下面的视频可以看到，动画质量几乎跟源数据一样不过位置已经修正到了我们期望的位置，效果自然且没有滑步。因此在一定的阈值范围内，我们可以纠正目标位置的这种差异，这使得我们的掩护系统能够在不同的情况下发挥作用。
+
+{通过修正角色跑到了我们期望的位置.mp4}
+
+我们也可以在一定程度上绕过障碍物, 我们从路径上采样并且指定目标位置后，运行Adjustment Blending
+
+{修正后可以绕过障碍物.mp4}
+
+你必须建立一个网络，每个格子代表一个动画，比如你想通过掩护到下面这个位置，那么就必须找到离这个位置最近的动画，然后通过修正达到我们的目的。这可能看起来是一个很大的覆盖面，但这种东西在mocap阶段是超级容易拍摄的，因为我不必担心脚步匹配或任何通常的技术限制，我只需设置好掩护物体，然后告诉演员，我需要你从这里走到这里，我不关心演员怎么做，我只需专注于表演即可。
+
+![找出最近的动画-44](.\TheAnimateButtonPic/44.png)
+
+你仍然需要一个常规的locomotion system作为保底方案，因为角色总是会有中断或者必须做很多转弯的时候，比如说如果你正在制作一个有很多走廊的游戏或者一个障碍物非常密集的环境，那么Adjustment Blending或许不是最好的选择。但是在一个有相对开放空间的游戏中，我认为Adjustment Blending会有一个真正的质量提升。
+
+这就是Adjustment Blending。
+
+我们在《Far Cry: Primal》中大量使用了它的离线版本，它确实有助于提高我们动画团队的工作效率。问题是Adjustment Blending并没有什么特别聪明的地方，我们的理念是："做我们的动画师已经在做的事情，只不过写一个脚本来自动完成"。于是我们开始思考，如果我们采用同样的理念并将其应用于整个动画编辑pipeline，会怎么样？
+
 ## Automation tools
+
+我们大概估计Adjustment Blending为我们所有的动画师节省了大约15%的时间，这听起来可能不是很多，但要知道育碧有很多动画师在做清理大量mocap的工作，所以这15%代表了大量的时间和精力被节省。随后我花了时间来复盘整个mocap pipeline，试图更好地了解我们作为mocap动画师的效率有多低，然后研究我们如何通过自动化任务来提高生产力。
 
 ## 我的总结
 
@@ -263,3 +357,8 @@ detect
 be supposed to be
 subtle
 steep
+appropriate
+estimate
+proposed this mandate
+inefficient
+investigate
