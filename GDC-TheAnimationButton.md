@@ -309,24 +309,80 @@ Adjustment Blending如何处理这个问题呢？我们知道角色打算停步�
 
 ## Automation tools
 
-我们大概估计Adjustment Blending为我们所有的动画师节省了大约15%的时间，这听起来可能不是很多，但要知道育碧有很多动画师在做清理大量mocap的工作，所以这15%代表了大量的时间和精力被节省。随后我花了时间来复盘整个mocap pipeline，试图更好地了解我们作为mocap动画师的效率有多低，然后研究我们如何通过自动化任务来提高生产力。
+我们大概估计Adjustment Blending为我们所有的动画师节省了大约15%的时间，这听起来可能不是很多，但要知道育碧有很多动画师在做mocap Clean-Up的工作，所以这15%代表了大量的时间和精力被节省。随后我花了时间来复盘整个mocap pipeline，试图更好地了解我们作为mocap动画师的效率有多低，然后研究我们如何通过自动化任务来提高生产力。
+
+下面的视频记录了我的工作日常，我会对我目前的工作内容进行分析。
+
+{Dan 的日常工作.mp4}
+
+然后我通过视频记录下我所做的一切，在某些情况下甚至是一些鼠标的点点点，并且我还会记下我做每个动作所花的时间。
+
+![Dan工作的详细记录-45](.\TheAnimateButtonPic/45.png)
+
+随后，我把所有这些单独的Actions合并为高层次的目标，比如，"我在这里到底想做什么？", "Rigs更新到最新版本"等，并把相应的花费时间都相加。
+
+![对详细记录进行合并-46](.\TheAnimateButtonPic/46.png)
+
+最后一列记录了自动化的难易程度，而这种难易程度的评估不仅是基于我这几年对于Motionbuilder的了解，也基于我在做这项任务时，有多少是真正需要思考，有多少是在重复性的点点点。比如说如果我必须做一些创造性的决定，或者我需要使用大量的动画原则才可以完成，那么就会把它归为一项很难或不可能自动化实现的任务。但是正如你可以看到右边所有的绿色，你会惊讶于这些任务只需一些基本信息就可以做自动搞定，比如"我应该在这里粘贴什么姿势"或者"我们应该转向到哪里"之类的信息。
+
+我们的工作效率到底有多低？
+
+![有相当一部分工作可以通过自动化去处理-47](.\TheAnimateButtonPic/47.png)
+
+因此我们有如下结论: 
+
+![50%-80%的工作可以通过自动化去处理-48](.\TheAnimateButtonPic/48.png)
+
+50-80%！你的动画师花在Mocap Clean-Up上的时间, 可能是计算机可以完成的工作...
+
+但必须得承认这是非常粗略的数字。这里会有一些时间上的浮动，如果你在自己的日常工作中做同样的分析，你可能会得到不同的结果，但是根据我的经验，我们在Ubi做的mocap和其他工作室做的差不多，如果你们做过Clean-Up类似的工作，你们中的一些人甚至可能对这个不感到惊讶。因此，有了这个有点疯狂的统计数字后我们开始研究如何将这些工作自动化...
+
+![重复繁杂的任务脚本化-49](.\TheAnimateButtonPic/49.png)
+
+这就是我们一开始提到的Automator, 我们基本上把动画师在Mocap Clean-Up时要做的那些高层次的任务写成脚本, 然后就是选择我们想运行的脚本以及我们想对每个脚本进行的设置, 你可以把你想象成你的AI小助手~
+
+必须要强调的是，我们的目标绝不是取代动画师，而是想让动画师从一些无聊的工作中解脱出来，把更多的精力放在有创造性且有趣的事情上，所以我认为任何人都不应该害怕自动化，它不是要取代动画师，它只是帮助动画师把事情做的更快。
+
+下面的视频介绍了Automator是如何工作的
+
+{Automator是如何工作的.mp4}
+
+照着这种思路进行下去，我们将来的工作会变成这样...
+
+{终结者2的视频.mp4}
+
+## Future
+
+做完这些后，我其实很难再回到常规的动画制作中去，因为每次我做任何事情都会开始考虑如何写一个脚本来实现自动化。对我们来说，我们的近期目标是支持尽可能多的case和边缘case。我也想关注下MotionMatching Pipeline的自动化任务等等
+
+最后，我也非常高兴看到Adjustment Blending在Runtime的效果，我真的希望你们中的一些人在自己的工作室里尝试这种方法，也想看看你们在这个基础上发展它！
 
 ## 我的总结
 
+* 开放大世界和自动化工具是绑定的
+
+* Adjustment Blending Runtime还需要关注FullBodyIK以及脚部固定约束的实现
+
+* 理解MotionBuiler中AdditiveLayer的原理也是实现Adjustment Blending的关键 
+
 ## Bonus!
 
-脚本地址
+Dan Lowe在他的Github上放出了Adjustment Blending的脚本代码，不过由于涉密的缘故，该脚本没有处理Hyper-Extension的问题，不过Hyper-Extension的问题和虚幻StrideWarping中碰到的问题一样，所以可以参考StrideWarping中的代码处理
+
+Dan Lowe之前的同事知乎大佬JAY JMS很早之前介绍过Adjustment Blending，并且成功在Maya上进行了移植，对于核心算法也做出了解释，可以参考
+
 
 https://zhuanlan.zhihu.com/p/34260822
 
 https://zhuanlan.zhihu.com/p/34330297
 
-DeltaCorrection
+Adjustment Blending本质上属于一种实时修正的技术，一提到动画修正我立马想到的是idsoftware在GDC中介绍的DeltaCorrection，我逢人就安利这次演讲，我真的强烈大家可以看下~
 
-MotionWarping
+提到实时修正就必然再说下UE5中的MotionWarping，MotionWarping的原理跟DeltaCorrection很相似
+
+
 
 ## 不明白的点
-* Layer原理
 * Adjustment Blending核心算法
 * MotionBuilder FullBodyIK在Adjustment Blending中充当的作用
 
@@ -362,3 +418,5 @@ estimate
 proposed this mandate
 inefficient
 investigate
+involved
+admittedly
