@@ -15,7 +15,7 @@ MMAssistant是Maksym Zhuravlov提供给动画师的一个辅助工具，协助�
 接下来我们看下MMAssistant的工作流程是怎么样的。
 
 ### Drop In Mocap Data And Finding the best take
-插入多条动捕动画，在其中比对寻找最佳的动画片段，比如第一个例子制作的是RunForwardStart的动画，我们从两者中找到了一个理想的动画。
+拖入多条动捕动画，在其中比对寻找最佳的动画片段，比如第一个例子制作的是RunForwardStart的动画，我们从两者中找到了一个理想的动画区间。
 
 ![在所有的动捕动画中选取最合适的动画](.\TLOU2MotionMatchingToolsPic/2.png)
 
@@ -35,10 +35,8 @@ MMAssistant是Maksym Zhuravlov提供给动画师的一个辅助工具，协助�
 
 ![MMAssistant主界面](.\TLOU2MotionMatchingToolsPic/3.png)
 
-
-
-
-
+### Get Rough Time Range
+正如前面提到的，我们打算制作RunForwardStart的起步动画，所以选择的是右侧的ellie-mm-explore-idle^run-strafe-fw-l-foot, 随后左边就是出现一个新的按钮提示选择StartFrame,在上面Finding the best take时已经找到了理想的动画区间，所以将时间轴拖到开始位置时点击‘Select START Frame’即可，随后又会出现‘Select END Frame’,同样将时间轴拖到相应位置点击即可 (这里注意一点的是可以将范围设置的略宽一些，后面会专门对导出范围进行细调)。随后又出现一个新的按钮‘OK,I'm DONE’, 点击该按钮，则要进行下面的运动路线校正。
 
 ### Path Correction Step
 MMAssistant工具在这一步干了三件事情：
