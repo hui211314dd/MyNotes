@@ -6,6 +6,8 @@
 
 ![常看常新](.\TLOU2MotionMatchingToolsPic/1.png)
 
+这个期间特别感谢Maksym Zhuravlov的耐心解答，耐心地说了很多有用的细节，帮助特别大，好人一生平安!
+
 ## MMAssistant
 
 {MMAssistant演示视频.mp4}
@@ -82,23 +84,75 @@ MMAssistant工具在这一步会根据角色重心位置(CenterOfMass)生成近�
 
 {LoopsInsertTool视频.mp4}
 
-LoopsInsertTool是Maksym Zhuravlov提供给动画师的另一个辅助工具，
+LoopsInsertTool是Maksym Zhuravlov提供给动画师的另一个辅助工具，辅助动画师处理循环动画和过渡动画接缝处之间的差异。以Start动画举例，我们希望Start动画后能够接上Loop动画，但是Start动画末尾帧与Loop动画相应的动画帧差异太大可能会导致Search不到，LoopsInsertTool工具可以帮助修复这种差异。
+
+![本质是个动画数据库](.\TLOU2MotionMatchingToolsPic/8.png)
+
+LoopsInsertTool存储了各个角度Loops动画的曲线数据，可以很容易地访问(用于PoseMatch对比)以及部署到Maya的动画层中。我们下面看下它的工作流是怎样的。
+
+### 找到合适的匹配帧
+首先是需要动画师确认下希望在哪一帧开始与Loop动画融合，比如视频中是第54帧
+
+### 插入Loop动画到新的Layer中
+将时间轴切到54帧后，点击LoopsInsertTool相应的Loop动画，比如当前编辑的是RunForwardStart动画，将来要融合的动画应该是run-loop-fw, 所以点击ellie-mm-explore-run-loop-fw即可，点击后工具主要做了两件事情:
+
+* 插入Loop动画到新的Layer中
+* LoopsInsertTool工具出现了新的面板，可以调整当前Pose的位置比如X, Z, XZ, ZX以及调整Phase等
+
+![插入Loop动画](.\TLOU2MotionMatchingToolsPic/9.png)
+
+动画师需要在这里调整Phase, X，Z等以至于当前的Loop动画帧与Start的动画帧动作大致对齐上
+
+![通过调整参数让Loop帧匹配上](.\TLOU2MotionMatchingToolsPic/10.png)
+
+位置和Pose对齐好后，点击‘Select Layer Weight Curve’按钮，开始调整Layer的权重。
+
+### 调整Layer权重
+在这一步需要调整BaseLayer与NewLayer的权重关系，比如平滑程度，平滑时间等。这一步特别重要，你可以不用导入到游戏引擎而在Maya中就可以看到Start切换到Loops时的效果，这可以帮助动画师快速解决接缝处不连续的问题。
+
+![调整Layer权重](.\TLOU2MotionMatchingToolsPic/11.png)
+
+调整完毕后点击左下角的‘All done!’, 下一步调整动画的AlignNode曲线
+
+### 调整Align
+工具会将Loop动画对应的Align插入当前动画的AlignNode曲线中，动画师可以在这里进行调整
+
+### 手动粘贴标准Idle
+新建Layer命名为idle_pose, 在动画开头粘贴上IdlePose, 这对于MotionMatching Search特别有用
+
+### KeyFrame
+手动打磨动画细节等
 
 ## Animation Analyzer
+{Animation Analyzer视频演示.mp4}
 
-## DebugTools
+Michal Mach介绍了他写的工具‘Animation Analyzer’,它可以程序化检查指定动画，根据MotionModel的要求，检查出哪些片段不规范，黄色的话是Warning，红色的话是Error，通过一些可视化的界面(比如DPS超过了阈值，Align速度曲线可视化，可以查一些速度突变的问题等)辅助动画师
+
+视频演示共解决了两个常见的问题，一是Align旋转的DPS超过了MotionModel中约定的值，动画DPS为284，而MotionModel定义的为180，超了50%，所以给出了Error提示。打开该动画，右上角有一个修改DPS的小工具
+
+![修改DPS小工具](.\TLOU2MotionMatchingToolsPic/12.png)
+
+点击GetDPS可以计算当前动画的DPS值，可以看到出现了“DPSis284.2[26-45] Add 11 frames”,表示需要添加11frames，DPS才会变成180，右上角三个棕色按钮分别表示向左侧添加Frames, 向两侧添加Frames以及向右添加Frames; 下面两个黄色按钮可以向左或向右整体移动DPS涉及到的Frames。修改后再次检测，发现DPS的问题已经解决了。
+
+另外一个问题视乎是速度变化异常，可能跟曲线的切线异常有关
+
+![工具提示视乎是bad tangent](.\TLOU2MotionMatchingToolsPic/13.png)
+
+打开可视化Tips发现确实切线异常
+
+![速度变化异常](.\TLOU2MotionMatchingToolsPic/14.png)
+
+发现原因后修改就很简单了
+
+![速度变化异常](.\TLOU2MotionMatchingToolsPic/15.png)
 
 ## 我的总结
-Align与动画分离
+Align的编辑，可以理解以meta-data的方式
 
-调整Trajectory的作用
+PathCorrection的作用, 要知道演员在动捕走直线时，走的路线也可能存在偏移的，比如偏了10度左右，通过PathCorrection可以将路线对准到标准线上，这样生成的RootMotion也都是很容易编辑的值(都在标准轴上)，但是如果偏差太大，PathCorrection旋转角色后，起始帧角色的朝向不是错了吗？我猜可以通过约束或者类似于AdjustmentBlend的技术解决
 
-成本，动画的自然与节奏
+如果你仔细看，可以发现MMAssistant和LoopsInsertTool都没有提到如何让Animation匹配MotionModel的参数，MotionMatching一直强调数据一致性，但是PlayerAnimSet在编辑时并没有提到这些，这是为什么呢？主要原因有两点：一是成本，二会破坏动画的自然与节奏，Maksym Zhuravlov在其他方面做了努力，包括PlayerWeightStrategy, IK, Camera等等，特别是过肩的Camera，可以让玩家更关注动画整体的流畅表现而不纠结在脚上。NPC的策略则不同，NPC的策略是MotionModel尽可能去适配Animation, 加上Clamp, NPC可以有效解决滑步的问题
 
-高效的工作流，TA的作用
+高效的工作流，这是显而易见的，这也是顽皮狗反复强调资深动画TA的原因
 
-DPS的处理
-
-## Bonus!
-
-## Next
+游戏角色的DPS是动画驱动的，配合每0.3-0.5s的实时Correction, 这也是为什么《最后生还者2》角色旋转时角色面对镜头是延迟的。
