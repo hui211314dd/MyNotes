@@ -112,15 +112,6 @@ TODO Sync原理
 5. URO原理以及流程？
 TODO URO使用以及原理
 
+MotionWarping, DeltaCorrection原理以及重要性，需要举例，比如怪物跳起攻击
 
-
-
-
-8月底要做的工作：
-1. 断线重连工程以及PPT
-2. 正常功能开发
-3. MotionMatching两个计划同时进行：Strafe/Turning等功能同步开发，以及Maya动画编辑，Python, Maya脚本等
-
-解析NodeLayout
-
-1. FeaturePosition是什么
+DistanceMatching的疑惑(通过Distance反推后的Pose与当前Pose差距过大)以及代码如何解决的
