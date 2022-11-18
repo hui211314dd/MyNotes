@@ -18,7 +18,7 @@
 编辑动画的步骤:
 1. 配置好环境，包括导入IdlePose, Loop动画(Walk,Jog,Sprint,Idle等)，定义好标准比如角色首帧Pose位置以及朝向。(特别重要，否则会出现PoseCost不符合预期的问题)
 2. 导入动画资源，选好片段后SetStart,SetEnd，然后BakeToControlRig
-3. 插入到story中，点击Ghost先设置到0，0点上，将Hips Trajectory打开，随后使用顶视角微调Ghost的位置，保证Hips的路线能够对齐到轴线上(即使旋转45度的起步动画也要对齐到轴线上)，旋转角色面向指定方向，比如-Z(可能出现偏差，没关系，后面会校正)
+3. 插入到story中，新建空Take, 点击Ghost先设置到0，0点上，先执行一次Frame SetBegin/End，将HipsEffector Trajectory打开，随后使用顶视角/前视角微调Ghost的位置(不一定非得是0,0点)，保证Hips的路线/两脚的中心点能够对齐到轴线上(即使旋转45度的起步动画也要对齐到轴线上)，旋转角色面向指定方向，比如-Z(可能出现偏差，没关系，后面会校正)
 4. Story中插入Loop动画(比如walk/idle)，对齐融合
 5. (可选：动画Range微调)Frame SetBegin/End，然后Bake到新的Take中，选中HipsControl，删除过渡点的关键帧
 6. 新建Layer，粘贴CorePose，处理矫正问题(比如期望是转身45度但实际30度)，滑步等问题，依赖AdjustmentBlend工具
@@ -30,6 +30,14 @@
 WalkSpeed: 122
 JogSpeed:
 SprintSpeed:
+
+WalkStartR:
+45: 40帧，1.333s, DPS = 33.758
+90: 42帧，1.4s,   DPS = 64.2857
+135:45帧，1.5s,   DPS = 90
+
+180:60帧，2s,     DPS = 90--弃用
+
 
 
 
