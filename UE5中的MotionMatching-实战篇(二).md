@@ -27,23 +27,46 @@
 9. Bake到Skeleton, 然后选中所有骨骼以及Character导出成动画文件
 
 
-WalkSpeed: 122
+特别重要：在第4步插入动画对齐融合时特别小心，插入动画的RootMotion数据要与Loop本身的动画完全一致，否则会出现PoseCost过大匹配不上，或者即使匹配上，动画会有横行或者纵向的抖动。配图说明：
+
+Transitions动画的Head和Tail如何处理：
+WalkStart的话，Head应该尽可能短(不要一帧，否则首帧计算出的速度值有问题，当然也可以设置LeadIn动画), Tail同样不建议直接一个Pose，可以接一段短的Loop动画，不要太长，如果PastTrajectory设置的是0.4s, 那么Tail长度0.5即可(前提是导入引擎后，WalkStart的FollowUp设置了WalkLoop？？？)，为什么这样呢？比如当前动画播放的是WalkStart的最后一帧，这时候需要Search查找下一个动画了，但是PastTrajectory还处于WalkStart加速的一个状态，整个Trajectory看起来不是一个稳定前进的形状，所以不会找到WalkLoop的动画，如果Tail长度足够长，Trajectory形状足够稳定了，所以会很自然找到WalkLoop。还有一个原因就是Tail仅仅一个Pose只能保证PosePosition相同，不要保证Velocity以及Phase相同。
+
+是否要使用引擎的LeadIn和Followup，这其实决定了动画制作的流程，不建议混用，使用LeadIn和FollowUp的话，动画师只需制作核心片段即可，但是要求与LeadIn和FollowUp动画首尾衔接，否则Foot的Velocity或者Phase计算有误；不使用LeadIn和FollowUp的话，动画师制作更为灵活，但修改Loop动画时修改起来比较麻烦。
+
+WalkStop的话，Head动画可以略微长点(防止Velocity和Phase匹配不上)，其他以上。
+
+Loop动画制作时要特别小心，特别是给Transition插入使用时，最好选取一个Cycle供使用，比如真正的WalkLoop有两个Cycle, 某些动画使用了前面的Cycle，另外一些动画使用了后面的Cycle, 这样混乱使用会导致Pose比较时不一致. 
+
+如果可以制作工具帮助插入Loop并且生成固定好的RootMotion数据最好了，因为每个动画都单独为Loop插入动画生成Root数据的话，会有差异。
+
+
+两个问题：
+1. MB中明明RootMotion数据相同，L1数据与R1连接时有位移
+2. L1结束时Search为什么Idle的PoseCost那么高呢
+
+
+WalkSpeed: 122，4.074/frame
 JogSpeed:
 SprintSpeed:
 
 WalkStartR:
-45: 40帧，1.333s, DPS = 33.758
-90: 42帧，1.4s,   DPS = 64.2857
+DPS和位置改变曲线尽可能相同
+45: 40帧，1.333s, DPS = 33.758， Distance: 95.84
+90: 42帧，1.4s,   DPS = 64.2857, 
 135:45帧，1.5s,   DPS = 90
 
 180:60帧，2s,     DPS = 90--弃用
 
-
+IDLEPose：
+RightFoot：X:18.82，Y:13.86
+LeftFoot：X：-23.70，Y:14.06
 
 
 动画插入stroy前先Bake到ControlRig上
 保存Pose前记得先Bake到ControlRig上
 Import Motion就是将导入fbx中的骨骼数值设置到当前Character的骨骼上，所以导入动画后Source选择None
 
-todo base_env需要定义好Relation约束，Root属性约束以及缩小网格线
-
+todo 
+Group Weight机制
+添加其他动画
