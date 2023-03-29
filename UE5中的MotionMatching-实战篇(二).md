@@ -67,6 +67,8 @@ LeftFoot：X：-23.70，Y:14.06
 保存Pose前记得先Bake到ControlRig上
 Import Motion就是将导入fbx中的骨骼数值设置到当前Character的骨骼上，所以导入动画后Source选择None
 
-todo 
-Group Weight机制
-添加其他动画
+Group Weight机制，目前不支持
+
+todo
+使用DPS预测动画，Rotation由AnimationDriven, 通过Spring进行Filter
+添加Circle动画，按住半径不同，制作LoopCircle动画

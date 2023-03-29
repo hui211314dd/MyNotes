@@ -41,6 +41,7 @@ ObjectMode有三种模式：
 
 框选所有关键帧可以整体横纵向缩放
 
+Timeline使用``鼠标中键``点击也可以跳到直接位置。按住Shift + 框选可以在Timeline选择多个关键帧
 
 # 变换物体
 ![Elements](./LearnMotionBuilderPic/1.png)
@@ -81,7 +82,7 @@ ObjectMode有三种模式：
 
 ![动画控制面板](./LearnMotionBuilderPic/7.png)
 
-* Animation是个菜单项，点开后有总多设置项
+* Animation是个菜单项，点开后有众多设置项
 * Type为关键帧之间插值方式，有Auto, Linear, Spline等
 * BaseAnimation中选择的是哪个层Layer, 可以选择或者新建
 * 快速定位到上一个关键帧的位置
@@ -215,7 +216,7 @@ TODO IK/FK
 
 ![创建好ControlRig](./LearnMotionBuilderPic/29.png)
 
-在X-Ray模式下可以看到，红色球状的是IK-Effector, 黄色线状的是FK-Effector，两者都是Effectors, 也重要让我明白Character Selection/Key Controls中的Effectors是代表Select/Key所有Effectors的意思......
+在X-Ray模式下可以看到，红色球状的是IK-Effector, 黄色线状的是FK-Effector，两者都是Effectors, 也终于让我明白Character Selection/Key Controls中的Effectors是代表Select/Key所有Effectors的意思......
 
 ![代表所有Effectors](./LearnMotionBuilderPic/30.png)
 
