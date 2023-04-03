@@ -1,4 +1,4 @@
-# 《MotionBuilder ProTips》01 - Bisic - UI Overview
+# 《MotionBuilder ProTips》01 - Basic - UI Overview
 
 本系列是我学习MotionBuilder过程中做的笔记内容，学习的是[Jonathan Colin](https://www.jonathan-colin.com/)在油管上的《MotionBuilder ProTips》系列。
 
