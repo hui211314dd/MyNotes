@@ -48,4 +48,6 @@ $\color{red}{TODO: Aux Effector如何生效？ 如何向LH RH那样自定义位�
 
 ## Character Extensions
 
-没有详细讲，只提到Character本身的东西在ControlRig中，额外另加的需要保存到Character Extensions中，比如RootCtrl, Weapon/Prop等
+[Character Extensions官方文档](https://help.autodesk.com/view/MOBPRO/2022/ENU/?guid=GUID-74B56BB9-7A04-48C2-9EBE-F6AE0CC312F0)
+
+角色扩展，没有详细讲，只提到Character本身的东西在ControlRig中，额外另加的需要保存到Character Extensions中，比如RootCtrl, Weapon/Prop, Wing等
