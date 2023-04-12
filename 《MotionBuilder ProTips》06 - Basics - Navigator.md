@@ -1,4 +1,4 @@
-# 《MotionBuilder ProTips》06 - Basic - Navigator
+# 《MotionBuilder ProTips》06 - Basics - Navigator
 
 <!-- ![Menu](./MotionBuilderProTips03/Menu.png) -->
 ## Navigator

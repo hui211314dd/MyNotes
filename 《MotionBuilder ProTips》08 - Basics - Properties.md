@@ -1,4 +1,4 @@
-# 《MotionBuilder ProTips》08 - Basic - Properties
+# 《MotionBuilder ProTips》08 - Basics - Properties
 
 <!-- ![Menu](./MotionBuilderProTips08/Menu.png) -->
 

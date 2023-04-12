@@ -1,4 +1,4 @@
-# 《MotionBuilder ProTips》09 - Basic - Character Controls
+# 《MotionBuilder ProTips》09 - Basics - Character Controls
 
 <!-- ![Menu](./MotionBuilderProTips09/Menu.png) -->
 

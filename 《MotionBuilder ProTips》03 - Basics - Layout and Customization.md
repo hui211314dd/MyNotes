@@ -1,4 +1,4 @@
-# 《MotionBuilder ProTips》03 - Basic - Layout and Customization
+# 《MotionBuilder ProTips》03 - Basics - Layout and Customization
 
 <!-- ![Menu](./MotionBuilderProTips03/Menu.png) -->
 

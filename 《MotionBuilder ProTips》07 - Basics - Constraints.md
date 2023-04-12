@@ -1,4 +1,4 @@
-# 《MotionBuilder ProTips》07 - Basic - Constraints
+# 《MotionBuilder ProTips》07 - Basics - Constraints
 
 <!-- ![Menu](./MotionBuilderProTips07/Menu.png) -->
 

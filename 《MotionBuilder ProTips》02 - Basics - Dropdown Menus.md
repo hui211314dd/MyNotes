@@ -1,4 +1,4 @@
-# 《MotionBuilder ProTips》02 - Basic - Dropdown Menus
+# 《MotionBuilder ProTips》02 - Basics - Dropdown Menus
 
 <!-- ![Menu](./MotionBuilderProTips02/Menu.png) -->
 

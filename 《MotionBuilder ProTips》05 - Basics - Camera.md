@@ -1,4 +1,4 @@
-# 《MotionBuilder ProTips》05 - Basic - Camera
+# 《MotionBuilder ProTips》05 - Basics - Camera
 
 <!-- ![Menu](./MotionBuilderProTips03/Menu.png) -->
 ## Camera Setup

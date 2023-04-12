@@ -1,4 +1,4 @@
-# 《MotionBuilder ProTips》04 - Basic - Viewport
+# 《MotionBuilder ProTips》04 - Basics - Viewport
 
 <!-- ![Menu](./MotionBuilderProTips03/Menu.png) -->
 ## Viewport
