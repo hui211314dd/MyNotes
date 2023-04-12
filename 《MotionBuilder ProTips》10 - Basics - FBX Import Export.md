@@ -20,7 +20,7 @@
 
 ![Root_B_2_CTL_Properties](./MotionBuilderProTips10/Root_B_2_CTL_Properties.png)
 
-这里需要注意的是属性中的OffsetR为-90或者90, 这是为了方便Maya和MotionBuilder，UnrealEngine之间的转换。
+这里需要注意的是属性中的OffsetR为-90或者90, 这是为了方便Maya和MotionBuilder，UnrealEngine之间的转换
 
 ![Root_CTL_Properties](./MotionBuilderProTips10/Root_CTL_Properties.png)
 
