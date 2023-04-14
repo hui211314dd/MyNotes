@@ -44,7 +44,7 @@ ReleaseAllPinning可以临时禁掉Pinning的作用
 
 想在Controls面板中创建额外的Effector比如RootCtrl可以选中一个Effector然后右键选择Create Aux Effector,即可创建, Effector的类型为Marker，可以在属性Marker Settings中更改其外观。
 
-$\color{red}{TODO: Aux Effector如何生效？ 如何向LH RH那样自定义位置以及不显示加号？Aux Pivot干啥的？}$
+$\color{red}{TODO: Aux Effector如何生效？Aux Pivot干啥的？}$
 
 ## Character Extensions
 
