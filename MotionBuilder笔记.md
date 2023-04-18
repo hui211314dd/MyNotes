@@ -18,7 +18,17 @@
 
 `Ctrl + W` 场景Node模式
 
-`Ctrl + A`循环设置Model模式， X-Ray模式， 正常模式
+`Ctrl + A` 循环设置Model模式， X-Ray模式， 正常模式
+
+`Ctrl + Space` 播放/暂停动画
+
+`Ctrl + 左箭头` 将Timeline设置到上一帧的位置
+
+`Ctrl + 右箭头` 将Timeline设置到下一帧的位置
+
+`Ctrl + 上箭头` 正常播放/暂停动画
+
+`Ctrl + 下箭头` 逆方向播放/暂停动画
 
 如果交互模式设置的为Maya:
 
@@ -41,7 +51,7 @@ ObjectMode有三种模式：
 
 框选所有关键帧可以整体横纵向缩放
 
-Timeline使用``鼠标中键``点击也可以跳到直接位置。按住Shift + 框选可以在Timeline选择多个关键帧
+Timeline使用``鼠标中键``点击也可以跳到直接位置。按住`Shift` + 框选可以在Timeline选择多个关键帧
 
 # 变换物体
 ![Elements](./LearnMotionBuilderPic/1.png)
