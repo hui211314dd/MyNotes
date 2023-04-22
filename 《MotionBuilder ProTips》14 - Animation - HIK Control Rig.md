@@ -67,9 +67,10 @@ Pinning在不同的编辑模式下有不同的行为，比如在FullBody模式�
 
 ## Body Part
 
-
+FullBody模式下，当选中一个Ctrl后所有的BodyPart都会高亮显示(高亮显示意味着当你Key值或者移动时所有的Ctrl都会响应)，但在BodyPart模式下，你选中某个Ctrl，只有同属一个BodyPart的Ctrls才会高亮/响应，我们有如下几个BodyPart: RightArm, LeftArm, LeftFingers, RightFingers, Spline, Hips, LeftLeg, RightLeg, Head等。角色被拆分成了这些BodyPart, 上面说过在BodyPart模式下，你选中某个Ctrl，只有同属一个BodyPart的Ctrls才会高亮/响应，所以当Pin住左手时，移动旋转左肘左肩，Pin始终生效，因为他们同属一个BodyPart，会相互配合响应，但如果此时移动旋转Spline时，左手的Pinning就会失效/被忽略，因为他们属于不同的BodyPart，BodyPart模式下不同的BodyPart互相不配合响应
 
 ## Selection
+
 
 
 ## Manipulation Tips
