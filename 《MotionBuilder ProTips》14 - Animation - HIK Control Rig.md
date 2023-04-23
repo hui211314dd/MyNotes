@@ -71,7 +71,11 @@ FullBody模式下，当选中一个Ctrl后所有的BodyPart都会高亮显示(�
 
 ## Selection
 
-
+Pinning功能只在BodyPart或者FullBody模式下生效，当切到Selection模式下可以看到Pinning图标就消失了, Pinning是希望其他身体部位对Pinning有反应的，因此Pinning在Selection模式下无意义
 
 ## Manipulation Tips
+
+在Controls中选择了单个Bar, 会同时选中相关联的多个FK，可以统一调整(同时旋转多个时需要注意是勾选的WorldSpace还是LocalSpace)
+
+[IK Blend /IK Pull 官方文档](https://help.autodesk.com/view/MOBPRO/2022/ENU/?guid=GUID-B784A3D0-A2A6-49D3-837F-B78BEC4BE8EB)
 
