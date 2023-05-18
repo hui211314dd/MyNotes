@@ -25,8 +25,23 @@ base骨骼臃肿，不能使用PostprocessAnimationBluePrint生成次级动画�
 AnimNode_CopyPoseFromMesh是这个方案的核心，这个节点的原理也特别简单即**将SourceMesh和TargetMesh具有相同名称的骨骼数据，从SouceMesh拷贝给TargetMesh**, 注意这里没有要求两个Mesh必须是同一个Skeleton，这就给了我们极大的灵活性，我们的base Skeleton始终是最为通用的那些骨骼，比如Hips, Spline, Head, Foot等等，普通的角色也都是基于这个Skeleton进行蒙皮，但有些角色可能会有一些定制化的东西，比如某个角色有摆动的耳坠，那么可以为这个Head单独加一个骨骼用于摆动。由于每个Mesh都拥有自己的动画蓝图和PostprocessAnimationBluePrint，可以添加更加表现丰富的次级动画。
 
 我们有如下几个建议：
-1. childmeshSkeleton 是 baseSkeleton的**超集**, 这样方便SetMasterPoseComponent，CopyPoseFromMesh两种方案根据LOD切换
+1. childmeshSkeleton在保留baseSkeleton主骨骼链的前提下，适当添加叶子骨骼
 2. FollowMeshComponents不应该有应该玩法的核心逻辑，它的逻辑只能是一些纯表现层的东西
 3. EventGraph代表了游戏逻辑，AnimGraph代表了表现，即使PostprocessAnimationBluePrint在使用SetMasterPoseComponent时AnimGraph没有执行，但EventGraph却依然在执行
 
+> 制作时常记的一个原则是保留主骨骼链的情况下尽可能删除无关的骨骼，比如制作Head时，保留Root到Head之间的骨骼链，再加上Head特有的骨骼比如表情骨骼，可能还需要加上clavicle，其他不相关的统统删除(比如Legs, Thigh等等)，不管Head导入引擎时是选择BodySkeleton还是新建Skeleton，CopyPoseFromMesh和SetMasterPoseComponent(Leader不存在的骨骼按照RefPose显示)都可以兼容，这样我们可以通过LOD的方式动态使用两种方法
+
 再说下Lyra和Fortnite的base都为一个单面体，这样base执行骨骼位置运算以及跑核心逻辑，它的child纯负责表现，具体角色是否长尾巴它也不需要知道，这样有个很大的好处是DS端可以不生成这些childMesh
+
+《Fortnite》部分Mesh:
+
+![Head](./UE5ModularCharacters/Head.png)
+
+![Body1](./UE5ModularCharacters/Body1.png)
+
+![Body2](./UE5ModularCharacters/Body2.png)
+
+![FaceAcc](./UE5ModularCharacters/FaceAcc.png)
+
+
+
