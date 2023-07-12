@@ -38,6 +38,8 @@ Default为默认的Overlay动画，它定义了一个很标准的Overlay模板�
 
 Idle/MovementPoses考虑了角色在不同Gait(Idle/Walk/Run/Sprint)以及姿态(Stand/Crouching)的Pose表现
 
+可以看到部分的Overlay动画是三帧，分别对应Idle/(Walk，Run,Sprint)/Crouching的情况
+
 InAirPoses考虑到了在空中的事情
 
 SecondaryMotion叠加了呼吸动画
@@ -123,13 +125,21 @@ Box的结构跟Default略有不同，可以看到Box考虑到了攀爬，翻滚�
 
 [虚幻引擎新增动画特性](https://www.bilibili.com/video/BV1UE41147jS/?share_source=copy_web&vd_source=e00408fe4d52d25a32600d385dd6b894)
 
-## 
+## Battel(扛桶)
 
+Injured的结构跟Default一致，但Curves值不太一样。
 
+非Crouching情况下可以看到Enable_HandIK_R为0，而Crouching下为1，因为Crouching的状态下需要右手扶着桶。
 
+![右手扶桶](./ALSV4Pic/13.png)
 
+还有就是在Crouching状态下，由于右手已经在扶桶了，因此不用再叠加Locomotion的动画了，所以Layering_Arm_R_Add在Crouching下为0
 
+有些设置跟Box类似，比如Layering_Head_Add等。
 
+## Binoculars(手持双筒镜)
+
+从这里开始，Overlay动画开始变的复杂了。。。
 
 
 
