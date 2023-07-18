@@ -141,7 +141,45 @@ Injured的结构跟Default一致，但Curves值不太一样。
 
 从这里开始，Overlay动画开始变的复杂了。。。
 
+Binoculars的动画蓝图跟上面的那些略有不同，因为从这里开始有区分是否是AnimingPose。我们先从简单的开始看，NotAimingPoses的动画蓝图跟之前的类似，但这里对Sprint单独做了区分，因为在Sprinting下左手要松开Binoculars，所以Sprinting的动画也做了单独的配置。
 
+![对Sprint做了特殊处理](./ALSV4Pic/14.png)
+
+如何区分的呢？我们知道Weight_Gait 0表示Idle, 1表示Walk(包括半蹲或者站立)，2表示Run, 3表示Sprint,因此Blend中使用的是Clamp(-2+CurveValue, 0, 1)因为Sprint时Alpha为1，其他情况则小于等于0
+
+查看ALS_Props_Binoculars_Poses动画我们可以发现Sprint下，Enable_HandIK_L为0, 而且Layering_Arm_L也为0, 即左胳膊完全使用BaseLayer动画，Layering_Arm_R变成了0.75，Layering_Arm_R_Add为0即希望右胳膊在手持Binoculars情况下也有轻微摆动而不是死死地固定在胸前。
+
+{Layering_Arm_R为0.75的情况.mp4}
+
+{Layering_Arm_R为1的情况.mp4}
+
+接下来看下AimingPoses的动画蓝图：
+
+![AnimingPoses部分动画蓝图](./ALSV4Pic/15.png)
+
+NotAniming与Animing模式下的动画在Curves配置上有些差别，我们以Idle举例:
+
+Enable_SpineRotation (0 -> 1)
+
+Layering_Arm_L_LS (1 -> 0)
+
+Layering_Arm_R_LS (1 -> 0)
+
+Layering_Head_Add (1 -> 0)
+
+Layering_Spline_Add (1 -> 0.5)
+
+Enable_SpineRotation稍后再说，Layering_Arm_L_LS和Layering_Arm_R_LS都变成了0，变成0的意思并不是说手臂的动作不使用了，而是换成MeshSpace去叠加(LayerBlending会详细讲)，Layering_Arm_L/R_MS的值始终等于(1 - Layering_Arm_L/R_LS)
+
+![设置Arm_LS和Arm_MS](./ALSV4Pic/16.png)
+
+再看下Enable_SpineRotation, 当Enable_SplineRotation为1时，AimOffsetBehaviors不再生效，而是直接旋转Pelvis, Spline_01, Spline_02, Spline_03, 比如当前角色看的目标点是右方40度的位置，那么四个骨骼分别向右旋转10度。启用Enable_SplineRotation对于武器瞄准特别有用，如果不使用Enable_SplineRotation可以看到角色没有向目标位置观察/瞄准。
+
+![应该始终Lookat我观察的方向](./ALSV4Pic/17.png)
+
+Enable_SplineRotation负责左右的瞄准，而AimSweepTime负责上下的瞄准。
+
+![AnmSweepTime负责上下的瞄准](./ALSV4Pic/18.png)
 
 # LayerBlending
 
@@ -166,14 +204,22 @@ Injured的结构跟Default一致，但Curves值不太一样。
 
 参考资料：
 
-
 [UE4分层混合节点LayeredBlendPerBone设置](https://zhuanlan.zhihu.com/p/428242048)
 
 # BaseLayer
 
+# AimOffsetBehaviors
+
 # FootIK
 
 # HandIK
+
+# RotationSystem
+
+## 不移动的情况下的原地旋转
+
+![不移动的情况下的原地旋转](./ALSV4Pic/不移动情况下的原地旋转.png)
+
 
 # Curves解释
 
@@ -181,6 +227,7 @@ Weight_Gait, 0表示Idle, 1表示Walk(包括半蹲或者站立)，2表示Run, 3�
 
 Weight_InAir, 0表示地面上，1表示在空中
 
+($\color{red}{TODO 曲线可以为-1，如何解释？}$)
 
 # Others
 
