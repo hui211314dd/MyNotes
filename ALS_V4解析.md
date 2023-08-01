@@ -141,7 +141,7 @@ Injured的结构跟Default一致，但Curves值不太一样。
 
 从这里开始，Overlay动画开始变的复杂了。。。
 
-Binoculars的动画蓝图跟上面的那些略有不同，因为从这里开始有区分是否是AnimingPose。我们先从简单的开始看，NotAimingPoses的动画蓝图跟之前的类似，但这里对Sprint单独做了区分，因为在Sprinting下左手要松开Binoculars，所以Sprinting的动画也做了单独的配置。
+Binoculars的动画蓝图跟上面的那些略有不同，因为从这里开始有区分是否是AnimingPose。我们先从简单的开始看，NotAimingPoses的动画蓝图跟之前的类似，但这里对Sprint单独做了区分，因为在Sprint下左手要松开Binoculars，所以Sprint的动画也做了单独的配置。
 
 ![对Sprint做了特殊处理](./ALSV4Pic/14.png)
 
@@ -178,9 +178,17 @@ Enable_SpineRotation稍后再说，Layering_Arm_L_LS和Layering_Arm_R_LS都变�
 
 ![应该始终Lookat我观察的方向](./ALSV4Pic/17.png)
 
-Enable_SplineRotation负责左右的瞄准，而AimSweepTime负责上下的瞄准。
+Enable_SplineRotation负责左右的瞄准，而AimSweepTime负责上下的瞄准。实现上也很简单，即提供一个长度为30帧即1s的MeshSpace叠加动画,内容是从仰视90度到俯视90度的内容，下面的蓝图内容完成了从AimingAngleY到AimSweepTime的映射。
 
 ![AnmSweepTime负责上下的瞄准](./ALSV4Pic/18.png)
+
+## Torch(手持火把)
+
+Torch的动画蓝图结构与Binoculars几乎一模一样，在动画的Curves上可能有些细微的差别，比如Torch在Aiming的情况下手臂仍然有一些摆动等等
+
+## Rifle(步枪)
+
+
 
 # LayerBlending
 
