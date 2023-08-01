@@ -145,7 +145,7 @@ Binoculars的动画蓝图跟上面的那些略有不同，因为从这里开始�
 
 ![对Sprint做了特殊处理](./ALSV4Pic/14.png)
 
-如何区分的呢？我们知道Weight_Gait 0表示Idle, 1表示Walk(包括半蹲或者站立)，2表示Run, 3表示Sprint,因此Blend中使用的是Clamp(-2+CurveValue, 0, 1)因为Sprint时Alpha为1，其他情况则小于等于0
+如何区分的呢？我们知道Weight_Gait 0表示Idle, 1表示Walk(包括半蹲或者站立)，2表示Run, 3表示Sprint,因此Blend中使用的是Clamp(-2+CurveValue, 0, 1)因此Sprint时Alpha为1，其他情况则小于等于0
 
 查看ALS_Props_Binoculars_Poses动画我们可以发现Sprint下，Enable_HandIK_L为0, 而且Layering_Arm_L也为0, 即左胳膊完全使用BaseLayer动画，Layering_Arm_R变成了0.75，Layering_Arm_R_Add为0即希望右胳膊在手持Binoculars情况下也有轻微摆动而不是死死地固定在胸前。
 
@@ -174,6 +174,7 @@ Enable_SpineRotation稍后再说，Layering_Arm_L_LS和Layering_Arm_R_LS都变�
 ![设置Arm_LS和Arm_MS](./ALSV4Pic/16.png)
 
 再看下Enable_SpineRotation, 当Enable_SplineRotation为1时，AimOffsetBehaviors不再生效，而是直接旋转Pelvis, Spline_01, Spline_02, Spline_03, 比如当前角色看的目标点是右方40度的位置，那么四个骨骼分别向右旋转10度。启用Enable_SplineRotation对于武器瞄准特别有用，如果不使用Enable_SplineRotation可以看到角色没有向目标位置观察/瞄准。
+(这里有一个问题，Pelvis也参与了旋转，但是Pelvis的旋转会直接导致腿部的旋转，如果保障腿部不旋转呢？可以看FootIK章节)
 
 ![应该始终Lookat我观察的方向](./ALSV4Pic/17.png)
 
