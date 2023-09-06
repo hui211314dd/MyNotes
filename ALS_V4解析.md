@@ -236,6 +236,16 @@ Weight_Gait, 0表示Idle, 1表示Walk(包括半蹲或者站立)，2表示Run, 3�
 
 Weight_InAir, 0表示地面上，1表示在空中
 
+————————————————
+一般根据MovementDirection切换状态。在MoveLB和MoveLF,MoveRB和MoveRF是会根据HipOrientation_Bias和Feet_Crossing切换。
+
+HipOrientation_Bias是臀部朝向的。HipOrientation_Bias<-0.5是hip left , HipOrientation_Bias>0.5是hip right。HipOrientation_Bias曲线在ALS_Props_Bow_Poses，ALS_Props_M4A1_Poses，ALS_Props_Pistol_1H_Poses，ALS_Props_Pistol_2H_Poses，ALS_Props_Torch_Poses动画里。
+
+Feet_Crossing值是脚的交叉。1是交叉，0是不交叉。Feet_Crossing曲线在ALS_CLF_Walk_L，ALS_CLF_Walk_R，ALS_CRF_Walk_L，ALS_CRF_Walk_R，ALS_N_Run_LB，ALS_N_Run_RB，ALS_N_Walk_LB，ALS_N_Walk_LF，ALS_N_Walk_RB，ALS_N_Walk_RF动画里。
+
+原文链接：https://blog.csdn.net/u013507300/article/details/105726598
+————————————————
+
 ($\color{red}{TODO 曲线可以为-1，如何解释？}$)
 
 # Others
