@@ -188,14 +188,29 @@ Torch的动画蓝图结构与Binoculars几乎一模一样，在动画的Curves�
 
 ## Rifle(步枪)
 
+Rifle应该算是OverlayLayer里面最复杂的之一了，其他的如Pistol1H, Pistol2H, Bow的结构都与Rifle类似，所以只分析Rifle一个就可以了。
 
+![Rifle动画蓝图](./ALSV4Pic/19.png)
+
+大致来看，跟之前的结构特别类似，对不同的OverlayOverrideState做了不同处理，但不同的是由于Rifle细节处理很多，这次添加了RifleStates的状态机。
+
+![Rifle动画状态机](./ALSV4Pic/20.png)
+
+**Rifle Relaxed**: 放松状态，主要区别与瞄准状态
+
+**Rifle Ready**: 主要用于瞄准状态到放松状态一个过渡状态，可以理解成一个警觉状态
+
+**Rifle Aiming**: 瞄准状态
+
+先看Rifle Relaxed，跟其他状态机一样处理了Crouched，InAir以及SecondaryMotion的情况，我们直接看StandingPoses的情况。
+
+![StandingPoses](./ALSV4Pic/21.png)
 
 # LayerBlending
 
 * Layering_***表示是否需要融合Overlay相关部位的动画，0表示不融合，完全使用BaseLayer中的动画，大于0表示最终效果可能需要Overlay和BaseLayer的综合效果(记住并不是表示完全使用Overlay)，具体比例得看下面的参数
 
 * Layering_Arm_L_Add表示将(BaseLayer-BasePose)这个叠加动画叠加到Overlay的程度，如果是1表示最终动画需要无删减的显示Overlay和BaseLayer的综合效果；如果是0表示完全使用Overlay的效果，BaseLayer的中这个部位的效果被舍弃。
-
 
 常见场景：
 如果Layering_***为0，则Layering_
