@@ -188,7 +188,7 @@ Torch的动画蓝图结构与Binoculars几乎一模一样，在动画的Curves�
 
 ## Rifle(步枪)
 
-Rifle应该算是OverlayLayer里面最复杂的之一了，其他的如Pistol1H, Pistol2H, Bow的结构都与Rifle类似，所以只分析Rifle一个就可以了。
+Rifle应该算是OverlayLayer里面最复杂的之一了，其他的如Pistol1H, Pistol2H, Bow的结构都与Rifle类似，所以只分析Rifle一个就可以了(状态机结构一样，只不过动画内部的CurveValues不同)。
 
 ![Rifle动画蓝图](./ALSV4Pic/19.png)
 
@@ -209,6 +209,24 @@ Rifle应该算是OverlayLayer里面最复杂的之一了，其他的如Pistol1H,
 正如上面所提到的，我们可以利用Weight_Gait对Idle, Walk, Run和Sprint做不同的处理，值得注意的是Run和Sprint对于手臂摆动做了不一样的处理。Run的做法是让一个手臂摆动动画与多个静止动画帧BlendMulti, 一个摆臂动画和一个静止动画帧融合，结果就是权重不同摆动的幅度不同。Weights参数使用的是VelocityBlend，这个参数由CalculateVelocityBlend计算所得，CalculateVelocityBlend计算逻辑是将Velocity(WorldSpace)转为LocalVelocity(LocalSpace), 并且做简单的归一化处理，返回的结果包含前后左右四个方向的值。Sprint的做法是两个甩臂动画的Blend, Weights参数由CalculateRelativeAccelerationAmount计算所得，CalculateRelativeAccelerationAmount计算逻辑跟CalculateVelocityBlend，不过计算的是加速度Acc。Weights参数只使用了X分量即向前的方向。
 
 >*可以看到所有的甩臂动画只包含了左右臂的曲线，而且这里打开了一个思路即如果Layering_Arm_L_Add效果不理想的情况下可以考虑加入单独的手臂动画*
+
+Relaxed状态下如果瞄准的话则先进入Rifle Ready状态紧接着会马上进入Rifle Aiming状态，那么我们先看Rifle Aiming状态。
+
+Rifle Aiming状态机跟之前提到的很类似，所以我们只重点关注Aiming状态下的CurveValues：
+
+Enable_SplineRotation 1: 允许左右瞄准
+
+HipOrientation_Bias 1: 瞄准的时候臀部朝向应该为右边(比如向左移动过程中开启瞄准，看到Hips有个转向)
+
+Layering_Arm_L/R 1, Layering_Arm_L/R_Add 0, Layering_Arm_L/R_LS 0: 左右手臂完全使用Overlay动画
+
+Layering_Head_Add 0.5：头部叠一点Locomation动作
+
+Layering_Spline_Add 0.75: Spline叠一点Locomation动作
+
+>*可以看到左右手臂全部使用的是Overlay单帧动画，如果不加SecondaryMotion的话会显的特别僵硬*
+
+当不再瞄准时会从Rifle Aiming状态过渡到Rifle Ready状态，Rifle Ready可以理解成一个警戒状态，区别于一个放松状态，可以快速地再次切入到Aiming状态。状态机结构很简单，不再赘述。
 
 # LayerBlending
 
