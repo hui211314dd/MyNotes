@@ -350,3 +350,6 @@ Bow LayeringArmLAdd 0.5
 
 (CLF)MoveF/(CLF)MoveB/(CLF)MoveRF/(CLF)MoveRB/(CLF)MoveLF/(CLF)MoveLB YawOffset FYaw
 
+# 参考资料
+
+[浅谈MeshSpace和LocalSpace](https://zhuanlan.zhihu.com/p/33234659)
