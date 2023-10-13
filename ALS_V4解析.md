@@ -254,6 +254,20 @@ Layering_Spline_Add 0.75: Spline叠一点Locomation动作
 
 # BaseLayer
 
+BaseLayer里描述了角色的基础Locomation，包括地面运动(直立以及半蹲)，空中等。放在BaseLayer都是最基础的运动，不论拿什么武器，什么状态(休闲，警戒，战斗等)都需要在这些基础运动上叠加，因此拿什么武器，什么状态都是放在Overlay里面的。
+
+![BaseLayer与Overlay的关系](./ALSV4Pic/22.png)
+
+BaseLayer内部有很多分层状态机，这里要提出一个很有意思的问题，**分层的依据是什么**?我们先看下BaseLayer的层结构图：
+
+![BaseLayer的层结构](./ALSV4Pic/23.png)
+
+可以看到下一层的层级状态机都是封装好后给上层服务的，因此分层时可以从顶层往下看，以ALS为例，从顶层来看，先区分空中和地面运动，具体地面运动很多细节先不管，因此率先分出了Main Movement State层，继续往下走，地面运动再从大的范围上分为站立的半蹲，因此又分出了Main Grounded States，依次类推。这种拆分特别类似于从顶向下的模块编程。
+
+## MainMovementStates
+
+
+
 # AimOffsetBehaviors
 
 # FootIK
