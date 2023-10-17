@@ -230,6 +230,14 @@ Layering_Spline_Add 0.75: Spline叠一点Locomation动作
 
 # LayerBlending
 
+在讲解LayerBlending之前一定要知道Curves的基础知识。我们在EventGraph和AnimGraph中都可以调用GetCurveValue这个函数，而且在AnimGraph放置的AnimSequence中也可能有Curve曲线，那现在有个问题，以下图为例，Blend使用的Layering_Legs的数值来源在哪里，是ALS_N_Walk_LB那里直接拿到的吗？还是后面ModifyCurve先计算的1？都不是，**是上一次AnimGraph返回的OutputPose存储的**，我们知道OutputPose不仅仅存储Pose还存储了Curves, Attributes等，其实我们看GetCurveValue内部实现就知道了，它拿的是AnimProxy中的数据，而AnimSequence中的Curves曲线数据和ModifyCurve修改的都是本次Evaluation中的FPoseContext::Curve数据，当然了，最终Evaluation生成的FPoseContext::Curve数据最终也是存储到AnimProxy中去的。
+
+![Curves基础知识](./ALSV4Pic/Curves基础知识.png)
+
+LayeringBlending如何处理BaseLayer和Overlay返回的Curves的呢？**相加即可**, 下面的节点做的工作就是Curves相加(下图中左边第一个LayeredBlendPerBone做的事情)并且完全覆盖掉BasePose传过来的Curves(下图中左边第二个LayeredBlendPerBone做的事情),因为BasePose传过来的Curves已经经历过很多Blend操作，没有任何价值了。
+
+![计算最终的Curves](./ALSV4Pic/计算最终的Curves.png)
+
 * Layering_***表示是否需要融合Overlay相关部位的动画，0表示不融合，完全使用BaseLayer中的动画，大于0表示最终效果可能需要Overlay和BaseLayer的综合效果(记住并不是表示完全使用Overlay)，具体比例得看下面的参数
 
 * Layering_Arm_L_Add表示将(BaseLayer-BasePose)这个叠加动画叠加到Overlay的程度，如果是1表示最终动画需要无删减的显示Overlay和BaseLayer的综合效果；如果是0表示完全使用Overlay的效果，BaseLayer的中这个部位的效果被舍弃。
@@ -240,7 +248,6 @@ Layering_Spline_Add 0.75: Spline叠一点Locomation动作
 
 如果Layering_***为1，Layering_
 ***_Add为0，表示完全使用Overlay的效果，调试模式下显示为白色($\color{red}{TODO 举例}$)
-
 
 如果Layering_***为1，Layering_
 ***_Add为1，表示是Overlay和BaseLayer的综合效果，调试模式下为红色($\color{red}{TODO 举例}$)
@@ -262,11 +269,27 @@ BaseLayer内部有很多分层状态机，这里要提出一个很有意思的�
 
 ![BaseLayer的层结构](./ALSV4Pic/23.png)
 
-可以看到下一层的层级状态机都是封装好后给上层服务的，因此分层时可以从顶层往下看，以ALS为例，从顶层来看，先区分空中和地面运动，具体地面运动很多细节先不管，因此率先分出了Main Movement State层，继续往下走，地面运动再从大的范围上分为站立的半蹲，因此又分出了Main Grounded States，依次类推。这种拆分特别类似于从顶向下的模块编程。
+可以看到下一层的层级状态机都是封装好后给上层服务的，因此分层时可以从顶层往下看，以ALS为例，从顶层来看，先区分空中和地面运动，具体地面运动很多细节先不管，因此率先分出了Main Movement State层，继续往下走，地面运动再从大的范围上分为站立和半蹲，因此又分出了Main Grounded States，依次类推。这种拆分特别类似于从顶向下的模块编程。
 
 ## MainMovementStates
 
+正如上面提到的，BaseLayer从最大范围拆分的话分为空中(InAir)和地面运动(Grounded), MainMovementStates处理的就是InAir和Grounded的关系，ALS的注释注释也提到如果要新增Flying, Swimming和Climbing的话，也可以在这里添加。
 
+![MainMovementStates](./ALSV4Pic/24.png)
+
+跟Overlay类似，这里同样使用导管处理不同的MovementState, 并且各个State的入口都是导管来处理。
+
+### Jump
+
+![JumpState](./ALSV4Pic/25.png)
+
+Jump在这里做了一个很多3A游戏都会处理的一个细节：区分起步/起跳/停步时左右脚的情况，怎么区分的？最简单有效的方式就是动画里设置CurveValues了，ALS也是这样的，曲线名为Feet_Position，这个曲线配置在所有移动相关的动画上，Feet_Position可以区分目前哪个脚打算Planted或者哪个脚已经Planted了(详细可以参考下面Curves解释章节)。通过Feet_Position可以区分起跳时双脚的情况，如果起跳时左脚Planted，则状态机走JumpLeftFoot，否则走JumpRightFoot。JumpLeft/RightFoot则是根据JumpPlayRate(奔跑速度越快JumpPlayRate越大)和Speed做了一个简单Blend, 打开ALS_N_JumpWalk动画，有两条曲线：Layering_Legs和Mask_LandPrediction
+
+Layering_Legs: -0.5, 我们第一次看到了Curves可以为负值，负值代表了什么含义呢？上面LayerBlending我们提到过最终的Curve等于BaseLayer和Overlay的对应的Curve和，而Overlay往往会对一些曲线值进行调整比如Layering_*
+系列的曲线用于调整最终的叠加效果，调整范围一般为[0, 1], 但本例中跳跃时我们不希望Overlay调整的原因导致跳跃时丢失太多的腿部的动作细节，相对比BaseLayer和Overlay的混合效果，我们更希望看到的是跳跃时BaseLayer很原汁原味的腿部细节，因此Layering_
+*设置为负值是希望在这个区间内最终效果更加偏向于BaseLayer的效果，尽可能削弱Overlay带来的影响。
+
+Mask_LandPrediction: 
 
 # AimOffsetBehaviors
 
@@ -296,6 +319,8 @@ Feet_Crossing值是脚的交叉。1是交叉，0是不交叉。Feet_Crossing曲�
 
 原文链接：https://blog.csdn.net/u013507300/article/details/105726598
 ————————————————
+
+Feet_Position:数值一般是-1，-0.2，0.2，1，负值表示左脚，正值表示右脚，abs(Feet_Position) < 0.5表示相应脚在空中即将planted，abs(Feet_Position) > 0.5 表示相应脚已经planted。比如0.2代表的含义是右脚在空中即将planted, 而1表示已经planted。该曲线一般用于起步/停步/跳跃时区分左右脚播放不同的动画。
 
 ($\color{red}{TODO 曲线可以为-1，如何解释？}$)
 
