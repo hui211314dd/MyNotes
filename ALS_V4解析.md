@@ -289,7 +289,29 @@ Layering_Legs: -0.5, 我们第一次看到了Curves可以为负值，负值代�
 系列的曲线用于调整最终的叠加效果，调整范围一般为[0, 1], 但本例中跳跃时我们不希望Overlay调整的原因导致跳跃时丢失太多的腿部的动作细节，相对比BaseLayer和Overlay的混合效果，我们更希望看到的是跳跃时BaseLayer很原汁原味的腿部细节，因此Layering_
 *设置为负值是希望在这个区间内最终效果更加偏向于BaseLayer的效果，尽可能削弱Overlay带来的影响。
 
-Mask_LandPrediction: 
+Mask_LandPrediction: 动画蓝图中有一个CalculateLandPrediction的函数，该函数在预测\`落地时间\`时使用，返回值的范围为[0, 1], 0认为没有要落地的迹象，1表示已经落地，因此这里提到的\`落地时间\`并不是绝对时间，这个数值在动画蓝图播放落地动画时特别有用。CalculateLandPrediction的实现也特别简单，从当前位置向运动方向做Capsule的碰撞检测，当前速度越快检测距离越远，返回结果后再判断是否可行走(IsWalkable)以及碰撞位置在Start和End的那个位置上(FHitResult::Time), 然后从LandPredictionCurve上取值(可以简单理解为1 - time), 到这一步其实可以将这个值返回的，但ALS加上了Mask_LandPrediction的曲线控制，为什么加这个控制呢？以JumpWalk动画为例，我们可能会刚起跳没多久就检测到需要播放Land动画(比如跳到一个不高的台阶上)，我们这时候希望起跳的前半段动画能够播放完再去混合Land动画，Mask_LandPrediction如果是1的话可以强制让CalculateLandPrediction返回0，Mask_LandPrediction如果是小于1的值会让计算结果跟0做个融合。因此Mask_LandPrediction可以解释为屏蔽Land动画的程度。
+
+还有一个有意思的点是JumpLoop和Flail的条件始终为true，因此状态机刚到JumpLoop会马上跳到Flail上，但Transition设置的BlendTime为1，因此前1s会是JumpLoop和Flail的一个融合效果，后面会一直是Flail，因此不要认为JumpLoop没有任何作用。
+
+Jump后面又对Lean, LandPrediction的情况做了处理，重点是LandPrediction，可以看空中到即将落地这段时间里状态仍然是Jump，Jump处理LandPrediction的好处是从Jump过渡到Land状态时会更加平滑自然(因为Jump已经提前过渡到了ALS_N_Land_Heavy/Light的第一帧)。
+
+### Land/LandMovement
+
+![LandState](./ALSV4Pic/26.png)
+
+Land/LandMovement处理的就是跳到地面那一段时间腿部的状态，Land即没有任何输入下落地-站立的过程，而LandMovement处理的是落地的瞬间有输入的情况，做法就是MainGroundedStates的基础上添加Land_Additive，这样落地后可以马上行走并且又有落地后膝盖下压又起来的效果。
+
+![LandState](./ALSV4Pic/27.png)
+
+在ALS_N_Land_Light/Heavy动画中有两条曲线，分别是Mask_FootstepSound, Mask_Sprint:
+
+Mask_FootstepSound: 配合Footstep_AnimNotify使用，用于控制音效的音量大小，如果OverrideMaskCurve为false，则生成的音效音量等于(1 - GetCurveValue(Mask_FootstepSound)) * VolumeMultiplier; 如果如果OverrideMaskCurve为true，Mask_FootstepSound不生效，直接使用VolumeMultiplier。
+
+>_为什么处理CurveValue时都要(1 - CurveValue)呢？因为Curve默认值一般都为0，当动画没有任何曲线时应该保证正常运行_
+
+Mask_Sprint: 
+
+>_Land导管可以分别进入Land或者LandMovement, 但红色的Transition始终为true并且优先级也是1,根据InAir的设置，我觉得这里应该是个bug, 红色的Transition的优先级应该是2_
 
 # AimOffsetBehaviors
 
@@ -322,7 +344,7 @@ Feet_Crossing值是脚的交叉。1是交叉，0是不交叉。Feet_Crossing曲�
 
 Feet_Position:数值一般是-1，-0.2，0.2，1，负值表示左脚，正值表示右脚，abs(Feet_Position) < 0.5表示相应脚在空中即将planted，abs(Feet_Position) > 0.5 表示相应脚已经planted。比如0.2代表的含义是右脚在空中即将planted, 而1表示已经planted。该曲线一般用于起步/停步/跳跃时区分左右脚播放不同的动画。
 
-($\color{red}{TODO 曲线可以为-1，如何解释？}$)
+Mask_LandPrediction: 动画蓝图中有一个CalculateLandPrediction的函数，该函数在预测\`落地时间\`时使用，返回值的范围为[0, 1], 0认为没有要落地的迹象，1表示已经落地，因此这里提到的\`落地时间\`并不是绝对时间，这个数值在动画蓝图播放落地动画时特别有用。CalculateLandPrediction的实现也特别简单，从当前位置向运动方向做Capsule的碰撞检测，当前速度越快检测距离越远，返回结果后再判断是否可行走(IsWalkable)以及碰撞位置在Start和End的那个位置上(FHitResult::Time), 然后从LandPredictionCurve上取值(可以简单理解为1 - time), 到这一步其实可以将这个值返回的，但ALS加上了Mask_LandPrediction的曲线控制，为什么加这个控制呢？以JumpWalk动画为例，我们可能会刚起跳没多久就检测到需要播放Land动画(比如跳到一个不高的台阶上)，我们这时候希望起跳的前半段动画能够播放完再逐渐混合Land动画，Mask_LandPrediction如果是1的话可以强制让CalculateLandPrediction返回0，Mask_LandPrediction如果是小于1的值会让计算结果跟0做个融合。因此Mask_LandPrediction可以解释为屏蔽Land动画的程度。
 
 # Others
 
