@@ -220,9 +220,9 @@ HipOrientation_Bias 1: 瞄准的时候臀部朝向应该为右边(比如向左�
 
 Layering_Arm_L/R 1, Layering_Arm_L/R_Add 0, Layering_Arm_L/R_LS 0: 左右手臂完全使用Overlay动画
 
-Layering_Head_Add 0.5：头部叠一点Locomation动作
+Layering_Head_Add 0.5：头部叠一点Locomotion动作
 
-Layering_Spline_Add 0.75: Spline叠一点Locomation动作
+Layering_Spline_Add 0.75: Spline叠一点Locomotion动作
 
 >*可以看到左右手臂全部使用的是Overlay单帧动画，如果不加SecondaryMotion的话会显的特别僵硬*
 
@@ -237,6 +237,8 @@ Layering_Spline_Add 0.75: Spline叠一点Locomation动作
 LayeringBlending如何处理BaseLayer和Overlay返回的Curves的呢？**相加即可**, 下面的节点做的工作就是Curves相加(下图中左边第一个LayeredBlendPerBone做的事情)并且完全覆盖掉BasePose传过来的Curves(下图中左边第二个LayeredBlendPerBone做的事情),因为BasePose传过来的Curves已经经历过很多Blend操作，没有任何价值了。
 
 ![计算最终的Curves](./ALSV4Pic/计算最终的Curves.png)
+
+>_ApplyAdditive和ApplyMeshAdditive如何处理CurveValues的呢？**两者数值相加**_
 
 * Layering_***表示是否需要融合Overlay相关部位的动画，0表示不融合，完全使用BaseLayer中的动画，大于0表示最终效果可能需要Overlay和BaseLayer的综合效果(记住并不是表示完全使用Overlay)，具体比例得看下面的参数
 
@@ -261,7 +263,7 @@ LayeringBlending如何处理BaseLayer和Overlay返回的Curves的呢？**相加�
 
 # BaseLayer
 
-BaseLayer里描述了角色的基础Locomation，包括地面运动(直立以及半蹲)，空中等。放在BaseLayer都是最基础的运动，不论拿什么武器，什么状态(休闲，警戒，战斗等)都需要在这些基础运动上叠加，因此拿什么武器，什么状态都是放在Overlay里面的。
+BaseLayer里描述了角色的基础Locomotion，包括地面运动(直立以及半蹲)，空中等。放在BaseLayer都是最基础的运动，不论拿什么武器，什么状态(休闲，警戒，战斗等)都需要在这些基础运动上叠加，因此拿什么武器，什么状态都是放在Overlay里面的。
 
 ![BaseLayer与Overlay的关系](./ALSV4Pic/22.png)
 
@@ -309,9 +311,23 @@ Mask_FootstepSound: 配合Footstep_AnimNotify使用，用于控制音效的音�
 
 >_为什么处理CurveValue时都要(1 - CurveValue)呢？因为Curve默认值一般都为0，当动画没有任何曲线时应该保证正常运行_
 
-Mask_Sprint: 
+Mask_Sprint: 我们看下如果把Mask_Sprint删除掉会发生什么，删除后我们始终sprinting前进时起跳落地，落地后的状态如下：
+
+![去掉Mask_Sprint后的表现](./ALSV4Pic/28.png)
+
+可以看到腿部已经有些变形了，原因在于Sprint的动作本身使身体有些下倾，再加上Land_Additive+FootIK的影响导致了怪异的Pose, 而Mask_Sprint曲线的作用就是在这段时间暂时减弱Sprint动画的比重，因为后面提到的前进动画是Walk/Run和Sprint融合的结果，减弱Sprint动画的比重就会使得Walk/Run动画的比重增加，Hips不会压得太低。
+
+从LandMovement到Grounded有一个Transition条件是Automatic Rule Based On SequencePlayer In State为true, 这个属性的含义是**当前动画状态中的"相关性"动画播放节点的剩余时间 < 混合持续时间(Transition中的混合时间)**时自动触发，而LandMovement中的相关性动画就是Land_Additive，因此状态机会在Land_Additive动画播放完毕前自动切换到Grounded状态上。
 
 >_Land导管可以分别进入Land或者LandMovement, 但红色的Transition始终为true并且优先级也是1,根据InAir的设置，我觉得这里应该是个bug, 红色的Transition的优先级应该是2_
+
+## MainGroundedStates
+
+## (N/CLF)LocomotionStates
+
+## (N)LocomotionDetail
+
+## (N/CLF)LocomotionCycles
 
 # AimOffsetBehaviors
 
@@ -414,3 +430,8 @@ Bow LayeringArmLAdd 0.5
 # 参考资料
 
 [浅谈MeshSpace和LocalSpace](https://zhuanlan.zhihu.com/p/33234659)
+[Automatic Rule Based on Sequence Player in State](https://zhuanlan.zhihu.com/p/64624188)
+
+# TODO
+
+如果一个状态机里面有特别多的Blend节点，那么GetRelevantAssetPlayerFromState()返回哪个动画呢？具体细节？
