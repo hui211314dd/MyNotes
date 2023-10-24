@@ -317,13 +317,39 @@ Mask_Sprint: 我们看下如果把Mask_Sprint删除掉会发生什么，删除�
 
 可以看到腿部已经有些变形了，原因在于Sprint的动作本身使身体有些下倾，再加上Land_Additive+FootIK的影响导致了怪异的Pose, 而Mask_Sprint曲线的作用就是在这段时间暂时减弱Sprint动画的比重，因为后面提到的前进动画是Walk/Run和Sprint融合的结果，减弱Sprint动画的比重就会使得Walk/Run动画的比重增加，Hips不会压得太低。
 
-从LandMovement到Grounded有一个Transition条件是Automatic Rule Based On SequencePlayer In State为true, 这个属性的含义是**当前动画状态中的"相关性"动画播放节点的剩余时间 < 混合持续时间(Transition中的混合时间)**时自动触发，而LandMovement中的相关性动画就是Land_Additive，因此状态机会在Land_Additive动画播放完毕前自动切换到Grounded状态上。
+从LandMovement到Grounded有一个Transition条件是AutomaticRuleBasedOnSequencePlayerInState为true, 这个属性的含义是**当前动画状态中的"相关性"动画播放节点的剩余时间 < 混合持续时间(Transition中的混合时间)**时自动触发，而LandMovement中的相关性动画就是Land_Additive，因此状态机会在Land_Additive动画播放完毕前自动切换到Grounded状态上。
 
 >_Land导管可以分别进入Land或者LandMovement, 但红色的Transition始终为true并且优先级也是1,根据InAir的设置，我觉得这里应该是个bug, 红色的Transition的优先级应该是2_
 
+![ConduitOrder](./ALSV4Pic/ConduitOrder.png)
+
+这里要说导管的一个细节，假设当前状态在Entry, 图内的4个Transitions都为true, Conduit内部条件不确定，那么状态机执行逻辑是什么呢？会先比较1和2的PriorityOrder, 率先执行PriorityOrder小的，Conduit属性面板里面没有PriorityOrder，**则使用默认值1**，如果1的PriorityOrder小则会执行状态A, 否则会先检查下Conduit内部的条件：
+* 如果为true然后再次比较3和4，PriorityOrder小的则执行其状态；
+* 如果Conduit内部条件为false，则会执行A。
+
 ## MainGroundedStates
 
+![MainGroundedStates](./ALSV4Pic/4.png)
+
+正如上面提到的，MainGroundedStates主要定义的是Standing与Crouching的转换逻辑。先看下MainGroundedStates上的属性设置，MaxTransitionsPerFrame设置为1，表示只做第一层的Transtions检测，即状态机进入Entry状态(不会进入到Entry状态里面执行)后会立即做第一层的检测，因此可以初始时就进入FromRoll或者(N)Standing或者(CLF)CRouchingLF状态。
+
+### Entry
+
+可以看到Entry->(N)Standing的Transition和Entry->(CLF)CrouchingLF的Transtion是互斥的，因此状态机一定不会在Entry上停留，会迅速跳转到其他状态上，但Entry的属性LeftStateEvent上配置了Notify，因为离开Entry状态时会执行该Notify, 该Notify的逻辑就是把GroundedEntryState重置。
+
+### FromRoll
+
+执行完Roll动画后状态会走到这里，这是个起身后的单帧动画。这里着重注意的是，FromRoll->(N)Standing中有一个Transition是AutomaticRuleBasedOnSequencePlayerInState为true，但刚才提到了FromRoll仅仅是一帧动画，这时候"相关性"动画播放节点的剩余时间等于多少呢？**等于所取的那一帧到动画末尾的时间**，因为ALS_N_LandRoll_F长度为1.5，而所取的帧正好也是1.5s, 因为剩余时间始终小于Transition中的混合时间，因此这是个恒为true等Transition, 因此FromRoll->(N)Standing的第二个Transition就没有必要了。
+
+### (N)Standing/(CLF)CrouchingLF
+
+Standing使用的是(N)LocomotionStates, 而CrouchingLF使用的是(CLF)LocomotionStates, 在不同的状态执行了不同LocomotionStates, 状态机在这里做了一个大的分叉。
+
+![走向了不同的路口](./ALSV4Pic/29.png)
+
 ## (N/CLF)LocomotionStates
+
+
 
 ## (N)LocomotionDetail
 
