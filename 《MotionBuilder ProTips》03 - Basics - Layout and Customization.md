@@ -10,9 +10,13 @@
 
 作者自定义了多个
 JoCo_Default:
+
 JoCo_Expert_Mode: 导出动画时使用
+
 JoCo_Full_Navigator: 方便查找资源，编辑属性，约束以及Story等
+
 JoCo_MonoScreen: 所有项目都同屏，方便教学使用
+
 JoCo_Tuto:
 
 ## User Settings saving locations
