@@ -349,7 +349,48 @@ Standing使用的是(N)LocomotionStates, 而CrouchingLF使用的是(CLF)Locomoti
 
 ## (N/CLF)LocomotionStates
 
+MainGroundedStates处理完了是Standing与Crouching的转换逻辑，而(N)LocomotionStates处理Standing状态下NotMoving/Moving/Stop/AnimingRotation之间的转换逻辑，(CLF)LocomotionStates同理。
 
+## NotMoving
+
+如果是静止不动的话，状态机不再会有深的嵌套了，NotMoving直接在这里使用了ALS_N_Pose作为最末端的Pose, 因此站立不动的情况下状态机不会再走LocomotionDetail和LocomotionCycles。
+
+在离开NotMoving状态时会调用AnimNotify_StopTransition
+
+## Moving
+
+进入Moving状态时也会调用AnimNotify_StopTransition。内部逻辑是LocomotionDetail状态机的结果。
+
+Outpin有两个，一个指向NotMoving另一个指向Stop，指向NotMoving的条件是Not ShouldMove, 指向Stop的条件是Not ShouldMove AND StateWeight(Moving) == 1, 比如说摁下前进后又迅速松开，这时候StateWeight(Moving) < 1, 因此没有必要走完整的Stop流程，直接Blend到NotMoving即可。
+
+## Stop
+
+停步(Stop)是LocomotionStates里面的核心内容，我们知道很多3A游戏都对停步做了很细致的处理，比如停步时左脚或者右脚在前时要执行不同的逻辑，我们重点看下ALS做了哪些细致的处理。
+
+>_Moving->Stop的TransitionDuration为0，而Stop->NotMoving的条件是GetInstanceStateWeight == 1.0,TransitionDuration为0.3,因此Stop播放一帧就慢慢切换到NotMoving了，因此不会出现播放DynamicStopMontage无法切换到NotMoving的问题_
+
+![Stop](./ALSV4Pic/30.png)
+
+在上面Jump章节已经提到了通过Feet_Position曲线可以知道当前两个脚的情况，通过abs(Feet_Position)可以区分相应的脚是已经落地还是即将落地，通过正负值可以区分是左脚还是右脚，总体分为如下四种情况：
+
+### 左脚已经落地
+
+LockLeftFoot内部很简单，在继续使用LocomotionDetail的前提下将FootLockL设置为1，但进入LockLeftFoot的状态时调用了一个->NStopL的Event，这个Event的作用就是播放了一个动态蒙太奇，动画是ALS_N_Stop_L_Down，这是个腿部整理动画，动画从0.4s开始播放，也是右脚从抬起到落下的一个表现，Slot在GroundedSlot, 因此下一帧LocomotionStates的状态就会切到NotMoving上，因此播放完ALS_N_Stop_L_Down动画后又会很自然融合到NotMoving状态上。
+
+### 右脚已经落地
+
+原理同上
+
+### 左脚在空中即将落地
+
+
+
+### 右脚在空中即将落地
+
+
+## RotateLeft/Right90
+
+具体细节可以参考下面的RotationSystem
 
 ## (N)LocomotionDetail
 
@@ -367,6 +408,7 @@ Standing使用的是(N)LocomotionStates, 而CrouchingLF使用的是(CLF)Locomoti
 
 ![不移动的情况下的原地旋转](./ALSV4Pic/不移动情况下的原地旋转.png)
 
+## 瞄准情况下的原地旋转
 
 # Curves解释
 
