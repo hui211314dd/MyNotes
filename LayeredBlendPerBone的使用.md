@@ -2,7 +2,7 @@
 
 Anim1为一个抬左腿的动画，包括thigh_l和calf_l的旋转。
 
-{Anim1动画.mp4}
+<video src="./UE5LayeredByBoneMov/Anim1动画.mp4"></video>
 
 Anim2为一个躺下的动画：
 
@@ -18,16 +18,15 @@ Anim2为一个躺下的动画：
 
 我们看下效果：
 
-{MeshSpaceRotationBlend.mp4}
+<video src="./UE5LayeredByBoneMov/MeshSpaceRotationBlend.mp4"></video>
 
 我们把MeshSpaceRotationBlend设置为false，再看下效果：
 
-{LocalSpaceRotationBlend.mp4}
+<video src="./UE5LayeredByBoneMov/LocalSpaceRotationBlend.mp4"></video>
 
 我们在BranchFilters中再添加一个calf_l, BlendDepth为-1，表现如下：
 
-{只想组合一段骨骼链上的动画.mp4}
-
+<video src="./UE5LayeredByBoneMov/只想组合一段骨骼链上的动画.mp4"></video>
 
 我们可以得出如下结论：
 
@@ -40,5 +39,3 @@ Anim2为一个躺下的动画：
    BoneName: B BlendDepth: 0
    
    BoneName: E BlendDepth: -1
-
-
