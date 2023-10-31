@@ -375,7 +375,13 @@ Outpin有两个，一个指向NotMoving另一个指向Stop，指向NotMoving的�
 
 ### 左脚已经落地
 
-LockLeftFoot内部很简单，在继续使用LocomotionDetail的前提下将FootLockL设置为1，但进入LockLeftFoot的状态时调用了一个->NStopL的Event，这个Event的作用就是播放了一个动态蒙太奇，动画是ALS_N_Stop_L_Down，这是个腿部整理动画，动画从0.4s开始播放，也是右脚从抬起到落下的一个表现，Slot在GroundedSlot, 因此下一帧LocomotionStates的状态就会切到NotMoving上，因此播放完ALS_N_Stop_L_Down动画后又会很自然融合到NotMoving状态上。
+LockLeftFoot内部很简单，在继续使用LocomotionDetail的前提下将FootLockL设置为1，但进入LockLeftFoot的状态时调用了一个->NStopL的Event，这个Event的作用就是播放了一个动态蒙太奇，动画是ALS_N_Stop_L_Down，这是个腿部整理动画，特别重要的是这是一个**叠加动画**，动画从0.4s开始播放，也是右脚从抬起到落下的一个表现，Slot在GroundedSlot，在播放动态叠加蒙太奇的同时State逐渐过渡回了NotMoving。
+
+![LockLeftFoot](./ALSV4Pic/停步时左脚已经Planted.png)
+
+更详细的可以查看下面视频:
+
+{停步时左脚已经Planted.mp4}
 
 ### 右脚已经落地
 
@@ -387,6 +393,7 @@ LockLeftFoot内部很简单，在继续使用LocomotionDetail的前提下将Foot
 
 ### 右脚在空中即将落地
 
+原理同上
 
 ## RotateLeft/Right90
 
