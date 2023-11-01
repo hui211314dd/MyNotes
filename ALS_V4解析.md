@@ -383,13 +383,26 @@ LockLeftFoot内部很简单，在继续使用LocomotionDetail的前提下将Foot
 
 {停步时左脚已经Planted.mp4}
 
+>_需要注意的是Pre-Stop->FootDown->LockLeftFoot的TransitionTime为0，因此会立即切换到LockLeftFoot上_
+
 ### 右脚已经落地
 
 原理同上
 
 ### 左脚在空中即将落地
 
+相比于上面左脚已落地，这里有两个不同之处：
 
+1. PlantLeftFoot状态如下：
+   
+   ![PlantLeftFoot](./ALSV4Pic/31.png)
+
+   可以看到添加了LayeredBlendPerBone相关节点，我们当前的情况是左脚在空中即将落地，但是还没有落地，那么左脚落地后的Pose是什么样子呢？LayeredBlendPerBone和BlendMulti做的事情就是根据当前Velocity的情况推算出左脚的落地Pose，并将这个左脚Pose跟LocomotionDetail做一个组合。
+
+   ![PlantLeftFoot](./ALSV4Pic/32.png)
+   黄色是LayeredBlendPerBone后的Pose，红色是LocomotionDetail的Pose
+
+2. 假如上一帧还在空中下一帧就将左脚切到地面上会有一些突兀，这里将PreStop->PlantLeftFoot的TransitionTime设置为了0.1，保证有0.1s的时间既能让左脚通过LocomotionDetail完成一个落地动作，还能保证最终锁脚的效果。
 
 ### 右脚在空中即将落地
 
