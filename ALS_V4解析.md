@@ -414,7 +414,37 @@ LockLeftFoot内部很简单，在继续使用LocomotionDetail的前提下将Foot
 
 ## (N)LocomotionDetail
 
+![PlantLeftFoot](./ALSV4Pic/33.png)
+
+下面的(N)LocomotionCycles已经处理了从Walk到Run的动画过渡，那为什么还需要LocomotionDetail呢？这里的“Detail”指的就是状态改变时的细节变化，比如身体的倾斜。
+
+>_由于半蹲没有Walk和Run的状态，也不存在速度变化时的细节，因此CLF没有LocomotionDetail_
+
+### Walking
+
+这里有一个很意思的事情，既然状态改变时需要发生身体倾斜，为什么Walking的Outpin中有Running呢，一切转换都走->Run导管流程不好吗？这是因为LocomotionCycles中对于**加速度Acceleration**(注意是根据上下帧计算处理的加速度而不是InputAcceleration)不为0是已经做了身体前倾的处理，试想这个情景，Walking状态下翻滚然后突然Run, 这个时候Acceleration有值因为LocomotionCycles会给身体做了一个身体前倾，如果这里再前倾的话，那么最终的效果如下:
+
+![比较](./ALSV4Pic/34.png)
+
+Walking是走Running还是->Run导管有一个重要的判断条件是MachineWeight(MainGroundedStates)是否为1，因为当出现翻滚或者空中时，因为Slot的缘故，MainGroundedStates会短暂的处于未激活状态，因此MachineWeight(MainGroundedStates) < 1的话表明是刚刚落地/站立, MachineWeight(MainGroundedStates)= 1表示已经稳定了一段时间了。
+
+>_MachineWeight表示这个状态机节点最终权重值_
+
+进入->Run导管后仍然有两个选择：RunStart或者Walk->Run，当然这里我们可以新建一些变量比如Walking/Running持续时间, 或者ShouldMove持续时间等等，还有一个办法就是ALS用到的MachineWeight, 在上面LocomotionStates里面已经讲过存在NotMoving和Moving两个States, 当处于NotMoving时最终动画是一个站立Pose, 当处于Moving时才会走LocomotionDetail，当起步从NotMoving过渡到Moving时，NotMoving状态的权重逐渐降低，Moving的权重逐渐升高也意味着LocomotionDetail的权重也从0逐渐变为1，因此可以知道当MachineWeight(LocomotionDetail) < 1时意味着处于NotMoving->Moving的过渡期即RunStart, 等于1意味着一直处于Moving状态。
+
+>_打开两个Transitions看到使用的是MachineWeight((N)LocomotionStates),这是引擎显示的一个bug，如果你复制再粘贴这个节点可以看到使用的是MachineWeight((N)LocomotionDetail)_
+
+### RunStart/Walk->Run/FirstPivot/Second Pivot
+
+状态机内部实现很简单，都是叠加不同方向的倾斜动画。
+
+### Pivot
+
+下面的DirectionalStates中将会看到，当运动方向发生很大的改变时，会在**transition**中配置Pivot事件。比如向前跑(MoveF)的过程中突然后退(MoveB)。
+
 ## (N/CLF)LocomotionCycles
+
+
 
 # AimOffsetBehaviors
 
@@ -449,6 +479,8 @@ Feet_Crossing值是脚的交叉。1是交叉，0是不交叉。Feet_Crossing曲�
 Feet_Position:数值一般是-1，-0.2，0.2，1，负值表示左脚，正值表示右脚，abs(Feet_Position) < 0.5表示相应脚在空中即将planted，abs(Feet_Position) > 0.5 表示相应脚已经planted。比如0.2代表的含义是右脚在空中即将planted, 而1表示已经planted。该曲线一般用于起步/停步/跳跃时区分左右脚播放不同的动画。
 
 Mask_LandPrediction: 动画蓝图中有一个CalculateLandPrediction的函数，该函数在预测\`落地时间\`时使用，返回值的范围为[0, 1], 0认为没有要落地的迹象，1表示已经落地，因此这里提到的\`落地时间\`并不是绝对时间，这个数值在动画蓝图播放落地动画时特别有用。CalculateLandPrediction的实现也特别简单，从当前位置向运动方向做Capsule的碰撞检测，当前速度越快检测距离越远，返回结果后再判断是否可行走(IsWalkable)以及碰撞位置在Start和End的那个位置上(FHitResult::Time), 然后从LandPredictionCurve上取值(可以简单理解为1 - time), 到这一步其实可以将这个值返回的，但ALS加上了Mask_LandPrediction的曲线控制，为什么加这个控制呢？以JumpWalk动画为例，我们可能会刚起跳没多久就检测到需要播放Land动画(比如跳到一个不高的台阶上)，我们这时候希望起跳的前半段动画能够播放完再逐渐混合Land动画，Mask_LandPrediction如果是1的话可以强制让CalculateLandPrediction返回0，Mask_LandPrediction如果是小于1的值会让计算结果跟0做个融合。因此Mask_LandPrediction可以解释为屏蔽Land动画的程度。
+
+Mask_Lean: 无使用。
 
 # Others
 
