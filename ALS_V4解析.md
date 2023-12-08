@@ -206,7 +206,7 @@ Rifle应该算是OverlayLayer里面最复杂的之一了，其他的如Pistol1H,
 
 ![StandingPoses](./ALSV4Pic/21.png)
 
-正如上面所提到的，我们可以利用Weight_Gait对Idle, Walk, Run和Sprint做不同的处理，值得注意的是Run和Sprint对于手臂摆动做了不一样的处理。Run的做法是让一个手臂摆动动画与多个静止动画帧BlendMulti, 一个摆臂动画和一个静止动画帧融合，结果就是权重不同摆动的幅度不同。Weights参数使用的是VelocityBlend，这个参数由CalculateVelocityBlend计算所得，CalculateVelocityBlend计算逻辑是将Velocity(WorldSpace)转为LocalVelocity(LocalSpace), 并且做简单的归一化处理，返回的结果包含前后左右四个方向的值。Sprint的做法是两个甩臂动画的Blend, Weights参数由CalculateRelativeAccelerationAmount计算所得，CalculateRelativeAccelerationAmount计算逻辑跟CalculateVelocityBlend，不过计算的是加速度Acc。Weights参数只使用了X分量即向前的方向。
+正如上面所提到的，我们可以利用Weight_Gait对Idle, Walk, Run和Sprint做不同的处理，值得注意的是Run和Sprint对于手臂摆动做了不一样的处理。Run的做法是让一个手臂摆动动画与多个静止动画帧BlendMulti, 一个摆臂动画和一个静止动画帧融合，结果就是权重不同摆动的幅度不同。Weights参数使用的是VelocityBlend，这个参数由CalculateVelocityBlend计算所得，CalculateVelocityBlend计算逻辑是将Velocity(WorldSpace)转为LocalVelocity(LocalSpace), 并且做简单的归一化处理，返回的结果包含前后左右四个方向的值。Sprint的做法是两个甩臂动画的Blend, Weights参数由CalculateRelativeAccelerationAmount计算所得，CalculateRelativeAccelerationAmount计算逻辑跟CalculateVelocityBlend类似，不过计算的是加速度Acc。Weights参数只使用了X分量即向前的方向。
 
 >*可以看到所有的甩臂动画只包含了左右臂的曲线，而且这里打开了一个思路即如果Layering_Arm_L_Add效果不理想的情况下可以考虑加入单独的手臂动画*
 
@@ -443,6 +443,48 @@ Walking是走Running还是->Run导管有一个重要的判断条件是MachineWei
 下面的DirectionalStates中将会看到，当运动方向发生很大的改变时，会在**transition**中配置Pivot事件。比如向前跑(MoveF)的过程中突然后退(MoveB)。
 
 ## (N/CLF)LocomotionCycles
+
+![LocomotionCycles状态机](./ALSV4Pic/35.png)
+
+LocomotionCycles是整个Locomotion系统的核心部分，因此这里重点介绍讲解下。
+
+上面的图从左边开始看，看到了三个变量: WalkRunBlend, StrideBlend以及StandingPlayRate。
+
+* WalkRunBlend：当是Walking时值为0，当是Running或者Sprinting时为1，不存在其他值, 因此后面BlendSpace返回的动画都是同Gait Blend后的结果，不会存在Walk和Run融合后的Pose（过渡除外）
+
+* StrideBlend: CalculateStrideBlend函数的结果，速度转为步伐长度，速度越大，迈的步伐越大。Walk/Run/Crouch速度与步伐的对应关系配置在Curves曲线中。
+
+* StandingPlayRate: CalculateStandingPlayRate函数的结果，通过速度值并且参考StrideBlend得到播放速率，速度越大，播放速率越快，这里有意思的是，速度变快时调整步伐或者调整播放速率都可以，但StrideBlend的上线值是1，此时如果速度再加快时，希望的是步伐为1的同时播放速率变的更快，因此CalculateStandingPlayRate在计算播放速率时考虑到了StrideBlend的影响，如果StrideBlend能解决匹配的问题，通过除于StrideBlend会得到约等于1的播放速率。
+
+继续往右看，看到很多的BlendSpace, 它们分别是前行，后退，前行可直接融合的左移动(Hips朝左)，后退可直接融合的左移动(Hips朝右)，前行可直接融合的右移动(Hips朝右)，后退可直接融合的右移动(Hips朝左)以及Sprint等，我们以一个举例，比如前行：
+
+![前行的BlendSpace](./ALSV4Pic/36.png)
+
+横轴表示步伐长度，纵轴表示步态，步态在WalkRunBlend中已经说过非0即1(过渡除外)，通过一个二维的BlendSpace可以很轻易地把多种步态的动画放进一个BS里面；这里说下BS是如何实现步伐长度的，可以看到ALS_N_WalkPose_F和ALS_N_RunPose_F都是静止不动的Anim, 虽然静止不动，但两个动画内部都标记了Left/Right SyncMaker, 根据Phase同步的原理，当BS中的X轴从0变向1时，步伐的长度会越来越大, 可以简单理解为FeetPos = Blend(静止Anim时FeetPos, 正常行走Anim时FeetPos, XValue)。
+
+>_由于与静止Anim Blend的缘故，当XValue变小，步伐长度变小的同时步伐的高度同样也在变矮，因此会有拖着脚走路的感觉，一个优化的方法是ALS_N_WalkPose_F和ALS_N_RunPose_F替换为原地踏步动画_
+
+再往右汇聚到了CycleBlending，在CycleBlending中左边定义了F, B, LF, LB, RF, RB, Sprint众多Pose, CycleBlending在一个时间点只会使用其中的几个Pose, 其他的Pose会处于非激活的状态即不参与Evaluation; 有一点需要注意的是Walk/Run和Sprint其实是互斥的，因此接下来会选择是使用F还是Sprint, 然后就是Mask_Sprint的处理，这在上面已经提到过了。
+
+接下来就是Directional States:
+
+![DirectionalStates](./ALSV4Pic/37.png)
+
+默认会进入MoveF State中，MoveF使用的是F, B, LF, RF按照VelocityBlend进行MultiBlend, MultiBlend选中的这几个Pose有个要求是这个几个Pose必须可以平滑的相互Blend, 不可以存在FeetCrossing的问题，下图就是常见的FeetCrossing问题：
+
+![FeetCrossing](./ALSV4Pic/38.png)
+
+每个State里面还会设置YawOffset, YawOffset的值以及作用会在RotationSystem中讲解。
+
+上面提到了MoveF是四个Pose融合的结果，并不是说摇杆必须直直按着前才会在MoveFState偏一点点就会切到其他状态上，其实是在一个扇形区域内都始终处于MoveF State中，那么什么情况下就会从MoveF过渡到MoveLF呢？在说明之前我们先看另外一个变量MovementDirection，MovementDirection是一个复杂后的结果，表示当前角色相对于角色朝向应该朝那个方向Strafing移动(Looking或者Aiming才有意义)，结果可以是Forward, Left, Right, Backward, MovementDirection是由CalculateMovementDirection计算所得，这个函数大致的思想就是通过Velocity和AimingRotation转换为MovementDirection, 状态机不需要使用InputVector，ActorRotation等特别原始的数据，直接使用MovementDirection进行状态切换，MovementDirection变成Left了，那就切换状态到MoveLF或者MoveLB, 以此类推。
+
+![MovementDirection](./ALSV4Pic/39.png)
+
+CalculateMovementDirection的实现大致来说，就是根据Velocity相对于AimingRotation的Yaw偏移，角度落在哪个区间就使用哪个MovementDirection。
+
+![CalculateQuadrant中的bug](./ALSV4Pic/40.png)
+
+>_CalculateQuadrant这里的计算明显是错误的，因为传给IncreaseBuffer的值永远是true，我觉得这里应该改成如果Current = Forward，那么在判断是否继续是Forward时，IncreateBuffer是true, 否则是false, 因为Buffer的本意应该是避免在临界点附近出现摇摆不定的问题，因此一旦在某个MovementDirection的时候，应该偏向于它从而避免flip flopping_
 
 
 
