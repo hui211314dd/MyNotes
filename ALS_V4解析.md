@@ -486,7 +486,51 @@ CalculateMovementDirection的实现大致来说，就是根据Velocity相对于A
 
 >_CalculateQuadrant这里的计算明显是错误的，因为传给IncreaseBuffer的值永远是true，我觉得这里应该改成如果Current = Forward，那么在判断是否继续是Forward时，IncreateBuffer是true, 否则是false, 因为Buffer的本意应该是避免在临界点附近出现摇摆不定的问题，因此一旦在某个MovementDirection的时候，应该偏向于它从而避免flip flopping_
 
+我们继续回到Directional States话题，图中标记的Transition1的条件就是MovementDirection == Left的时候，Transaction2条件时MovementDirection == Forward的时候。我们接下来继续看MoveLF的状态。
 
+MoveLF中的L指的是Left, F指的是Forward可直接融合，同理，MoveRB中的R指的是Right, B指的是Backward可直接融合。与MoveLF状态关系很密切的动画是ALS_N_WalkRun_FL, 这个动画如下图所示，有个明显的特点是向左移动的时候身体朝向也是向左, 右脚在前。
+
+![ALS_N_WalkRun_FL](./ALSV4Pic/41.png)
+
+与此对应的还有一个动画是ALS_N_WalkRun_BL, B指的是Backward可直接融合，这个动画的特别是向左移动的时候身体朝向是朝右，左脚在前。
+
+![ALS_N_WalkRun_BL](./ALSV4Pic/42.png)
+
+你肯定会有这样一个疑问，为什么要提供两套向左移动的动画呢？这就涉及到了Strafing要解决的一个核心问题：上面提到的FeetCrossing，如果没有ALS_N_WalkRun_BL，当ALS_N_WalkRun_FL与ALS_N_Walk_B融合时会出现如下问题:
+
+{FeetCrossing.mp4}
+
+如果使用ALS_N_WalkRun_BL和ALS_N_Walk_B融合，就不会出现任何问题，如下：
+
+{ALS_N_WalkRun_BL和ALS_N_Walk_B融合.mp4}
+
+为了解决Strafing的FeetCrossing问题，ALS在动画融合时有三个原则：
+
+1. MoveF只能与MoveLF, MoveRF，MoveB直接连接，不可以与MoveLB, MoveRB直接连接
+
+2. Hips同朝向的可以直接连接，否则不可以连接，比如MoveLF和MoveRB, Hips都朝向左边，因此可以连接，MoveLF和MoveRF Hips朝向不同，不可以连接
+
+3. 没有特殊要求下，向左移动时偏向于使用MoveLF, 向右移动时偏向于使用MoveRF
+
+根据这些原则，当向左移动的过程中突然向右移动，状态机会MoveLF->MoveRB->MoveRF
+
+有了上面的理解，我们再看MoveLF和MoveLB之间的Transition34567就很容易理解了：
+
+* Transition3 MovementDirection == Backward, 即需要马上转换为MoveB, 但MoveLF无法直接转为MoveB，需要过渡到MoveLB
+* Transition4 HipOrientation_Bias指定朝右并且当前时机合适，比如手持Pistol_2H瞄准时，动画指定了HipOrientation_Bias为1，这就是上面原则3提到的特殊要求，因此即使向左移动，也不会再偏向于使用MoveLF, 而是使用MoveLB
+* Transition5 MovementDirection == Forward, 即需要马上转换为MoveF, 但MoveLB无法直接转为MoveF，需要过渡到MoveLF
+* Transition6 HipOrientation_Bias指定朝左并且当前时机合适
+* Transition7 PriorityOrder为1，会优先check, 判断条件有一项为HipOrientation_Bias < 0.5, 我们知道如果没有特殊要求，曲线的默认值为0，因此这就印证了上面的原则3，向左移动时偏向于使用MoveLF
+
+以上就是DirectionalStates重要的东西，其他细节的动画不再赘述。
+
+那么这套方案真的解决了FeetCrossing的问题吗？其实并没有。原因在于：
+
+1. MoveLF中，BlendMulti依然使用了Backward动画
+
+2. Transition3中提到的，当MovementDirection == Backward时需要马上转换为MoveB, 这时候不会也来不及考虑Feet是否有FeetCrossing的隐患
+
+{依然没有解决FeetCrossing.mp4}
 
 # AimOffsetBehaviors
 
