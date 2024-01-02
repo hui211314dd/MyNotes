@@ -1,3 +1,4 @@
+#! https://zhuanlan.zhihu.com/p/671859796
 # Ragdoll
 
 ![Ragdoll动画蓝图](./ALSV4Pic/1.png)
@@ -232,11 +233,11 @@ Layering_Spline_Add 0.75: Spline叠一点Locomotion动作
 
 在讲解LayerBlending之前一定要知道Curves的基础知识。我们在EventGraph和AnimGraph中都可以调用GetCurveValue这个函数，而且在AnimGraph放置的AnimSequence中也可能有Curve曲线，那现在有个问题，以下图为例，Blend使用的Layering_Legs的数值来源在哪里，是ALS_N_Walk_LB那里直接拿到的吗？还是后面ModifyCurve先计算的1？都不是，**是上一次AnimGraph返回的OutputPose存储的**，我们知道OutputPose不仅仅存储Pose还存储了Curves, Attributes等，其实我们看GetCurveValue内部实现就知道了，它拿的是AnimProxy中的数据，而AnimSequence中的Curves曲线数据和ModifyCurve修改的都是本次Evaluation中的FPoseContext::Curve数据，当然了，最终Evaluation生成的FPoseContext::Curve数据最终也是存储到AnimProxy中去的。
 
-![Curves基础知识](./ALSV4Pic/Curves基础知识.png)
+![Curves基础知识](./ALSV4Pic/CurvesBasic.png)
 
 LayeringBlending如何处理BaseLayer和Overlay返回的Curves的呢？**相加即可**, 下面的节点做的工作就是Curves相加(下图中左边第一个LayeredBlendPerBone做的事情)并且完全覆盖掉BasePose传过来的Curves(下图中左边第二个LayeredBlendPerBone做的事情),因为BasePose传过来的Curves已经经历过很多Blend操作，没有任何价值了。
 
-![计算最终的Curves](./ALSV4Pic/计算最终的Curves.png)
+![计算最终的Curves](./ALSV4Pic/FinalCurves.png)
 
 >_ApplyAdditive和ApplyMeshAdditive如何处理CurveValues的呢？**两者数值相加**_
 
@@ -256,6 +257,11 @@ LayeringBlending如何处理BaseLayer和Overlay返回的Curves的呢？**相加�
 
 ($\color{red}{如果两个数值都是大于0小于1的时候时，需要举例例子说明什么情况下调整哪个数值，毕竟两个数值都可以表示融合的程度}$)
 
+Layering_***与影响的骨骼链对应关系如下图：
+
+![对应关系图](./ALSV4Pic/44.png)
+
+>_注意Hands的LayeredBlendPerBone会处理VB LHS_ik_hand_gun和VB RHS_ik_hand_gun, 当Hand_L和Hand_R为1时可以避免BaseLayer的手部动画影响到武器，避免武器穿插，因为handik相关动画始终使用OverlayLayer, 武器绑定的位置与Hand相对位置始终保持稳定_
 
 参考资料：
 
@@ -377,7 +383,7 @@ Outpin有两个，一个指向NotMoving另一个指向Stop，指向NotMoving的�
 
 LockLeftFoot内部很简单，在继续使用LocomotionDetail的前提下将FootLockL设置为1，但进入LockLeftFoot的状态时调用了一个->NStopL的Event，这个Event的作用就是播放了一个动态蒙太奇，动画是ALS_N_Stop_L_Down，这是个腿部整理动画，特别重要的是这是一个**叠加动画**，动画从0.4s开始播放，也是右脚从抬起到落下的一个表现，Slot在GroundedSlot，在播放动态叠加蒙太奇的同时State逐渐过渡回了NotMoving。
 
-![LockLeftFoot](./ALSV4Pic/停步时左脚已经Planted.png)
+![LockLeftFoot](./ALSV4Pic/45.png)
 
 更详细的可以查看下面视频:
 
@@ -542,7 +548,7 @@ MoveLF中的L指的是Left, F指的是Forward可直接融合，同理，MoveRB�
 
 ## 不移动的情况下的原地旋转
 
-![不移动的情况下的原地旋转](./ALSV4Pic/不移动情况下的原地旋转.png)
+![不移动的情况下的原地旋转](./ALSV4Pic/43.png)
 
 ## 瞄准情况下的原地旋转
 
