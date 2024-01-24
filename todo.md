@@ -84,7 +84,6 @@ TSharedFromThis
 
 
 虚幻引擎必知项:
-AnimNode relevant???
 AnimSubSystem ???
 
 序列化与序列化，编辑器编辑与Runtime的关系
