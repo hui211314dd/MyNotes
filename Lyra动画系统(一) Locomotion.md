@@ -72,6 +72,8 @@ ABP_Mannequin_Base中的逻辑框架如下：
 
 ### TurnInPlace
 
+### RotateRootBone
+
 ### AnimNodeTag
 
 ### SyncGroup
