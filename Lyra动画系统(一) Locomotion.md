@@ -62,7 +62,33 @@ ABP_Mannequin_Base中的逻辑框架如下：
 
 ## Locomotion
 
+### Locomotion大致流程
+
+![Locomotion](./UE5LyraPic/Locomotion.png)
+
+默认状态为Idle，当有输入时会进入起步Start状态，随后会进入循环Cycle状态，这时如果没有输入的话会进入停步状态Stop, 或者输入方向反转时会进入Pivot状态。当处于前面这些所有状态时都有可能会被Jump或者落入空中所打断，JumpStart是Jump上升阶段时的状态，JumpApex则是开始自由落体时的状态，JumpStart最终会走过JumpApex状态，随后状态经过FallLoop和FallLand, 最后根据条件进入Idle或者Cycle。
+
+注意这里并没有像ALS那样为Crouching单独创建一个状态机，而是在各个State中都判断了当前是否是Crouch, 类似的还有是否在瞄准(IsADS)。
+
+![IsADSOrCrouch](./UE5LyraPic/IsADSOrCrouch.png)
+
 ### Functions的使用
+
+![OnBecomeRelevant](./UE5LyraPic/OnBecomeRelevant.png)
+
+我们先以最简单的为例，Idle状态在随机时间后会进入到IdleBreak中，可以为枯燥的Idle加入一点随机动作，IdleBreaks数组中可以配置多个动画轮流播放，这里可以看到是在OnBecomeRelevant里面写了逻辑，取动画->SetSequence->CurrentIndex+1, 之所以放在OnBecomeRelevant中是希望这个节点开始'相关'时调用一次设置，后面Update期间不用再管。
+
+>_`重要：`如果要在Functions中根据逻辑设置不同的Sequence，那么必须将SequencePlayer或者SequenceEvaluator中的Sequence变量设置成Dynamic_
+
+>_`注意：`由于多线程安全的缘故，不能在Functions里面调用不安全的随机函数，这里的技巧是获取当前角色的位置，(X+Y)%MaxNum计算所得。_
+
+![OnUpdate](./UE5LyraPic/OnUpdate.png)
+
+这里使用OnUpdate而非OnBecomeRelevant的原因也很简单，是因为在Idle状态不变的情况下也会出现更换Sequence的情况，比如Crouch, 因此需要OnUpdate中时刻监视是否需要更换Sequence。
+
+
+
+SequenceEvaluator
 
 ### DistanceMatching
 
@@ -70,9 +96,7 @@ ABP_Mannequin_Base中的逻辑框架如下：
 
 ### OrientationWarping
 
-### TurnInPlace
-
-### RotateRootBone
+### TurnInPlace和RotateRootBone
 
 ### AnimNodeTag
 
@@ -83,8 +107,6 @@ ABP_Mannequin_Base中的逻辑框架如下：
 ### SyncGroupNameToRequireValidMarkersRule
 
 ### WasAnimNotifyStateActieInSourceState
-
-### Locomotion大致流程
 
 ## 总结
 
