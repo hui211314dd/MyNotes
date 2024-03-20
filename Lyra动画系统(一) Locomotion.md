@@ -86,9 +86,13 @@ ABP_Mannequin_Base中的逻辑框架如下：
 
 这里使用OnUpdate而非OnBecomeRelevant的原因也很简单，是因为在Idle状态不变的情况下也会出现更换Sequence的情况，比如Crouch, 因此需要OnUpdate中时刻监视是否需要更换Sequence。
 
+>_`注意：`OnUpdate更改Sequence调用的是SetSequenceWithInertialBlending而不是SetSequence, 因为希望动画切换时能够平滑过渡。_
 
+![SequenceEvaluator](./UE5LyraPic/SequenceEvaluator.png)
 
-SequenceEvaluator
+SequenceEvaluator与SequencePlayer最大的不同是SequencePlayer的动画是自动播放，即它的播放时间是自动更新的，而SequenceEvaluator如果不手动更新时间的话(ExplicitTime)，那它始终是在那一帧。上图在处于StartState时，OnBecomeRelevant负责选择动画，OnUpdate负责更新ExplicitTime。
+
+>_`重要：`如果有更新ExplicitTime的需要，必须把ExplicitTime变量设置成Dynamic_
 
 ### DistanceMatching
 
