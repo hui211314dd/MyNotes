@@ -96,6 +96,16 @@ SequenceEvaluator与SequencePlayer最大的不同是SequencePlayer的动画是�
 
 ### DistanceMatching
 
+Lyra中共有4个States用到了DistanceMatching，分别是Start, Stop, Pivot以及FallLand，接下来我们逐个分析下它们是如何使用DistanceMatching的。
+
+### Start
+
+### Stop
+
+### Pivot
+
+### FallLand
+
 ### StrideWarping
 
 ### OrientationWarping
