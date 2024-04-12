@@ -143,7 +143,7 @@ AddExtensionHandler内部逻辑查找当前World中的所有Pawns, 这些Pawns�
 
 GameFeatureAction收到Event时需要自行处理逻辑，比如添加Abilities，添加UI, 修改配置等等。
 
-ExtensionHandlerSystem本质上处理的还是时机问题：**GameFeatureAction执行时已经有Actors初始化完成了怎么办？后面新生成的Actors Ready了怎么办？**
+ExtensionHandlerSystem本质上处理的还是时机问题：**GameFeatureAction执行时Actors初始化完成了怎么办？后面新生成的Actors Ready了怎么办？**
 
 如果NAME_ExtensionAdded和NAME_ReceiverAdded都不能满足所需，可以自定义一些Event比如NAME_BindInputsNow来满足特殊的需求，NAME_ExtensionAdded仅仅意味着调用这个Action时刚好有些Actors初始化完毕了而已，这些信息并不代表你接下来要执行的逻辑一定能成功。
 
@@ -170,18 +170,72 @@ void UGameFeatureAction_AddInputBinding::HandlePawnExtension(AActor* Actor, FNam
 
 #### Initialization States
 
+InitStates本质就是一个状态机的更新逻辑，以Lyra为例，一步一步看下执行逻辑。
+
 ### Lyra
-
-#### LyraPawnExtensionComponent
-
-PawnExtendionComponent不适合什么回调都往里放，不仅仅越来越臃肿，而且回调发生后会通知所有实现者都check, 一些完全不在乎这个数据的实现者也不得不check,PawnExtensionComponent适合一些基础数据的check,比如PlayerController和PlayerState
 
 #### LyraHeroComponent
 
+Lyra的需求是这样的，LyraHeroComponent需要负责初始化输入和镜头处理，LyraHeroComponent需要当如下数据准备好时才能正确地初始化：
+
+* PlayerController和Pawn已经Possess上
+* PlayerState初始化完成并且Owner已经设置为PlayerController
+* PawnData已同步
+* Pawn::InputComponent已生成
+
+LyraHeroComponent要做如下事情：
+1. 继承IGameFrameworkInitStateInterface，拥有InitStates的能力；
+
+2. 重载GetFeatureName函数，返回一个代表改组件一个唯一的名字
+
+3. 在OnRegister中调用RegisterInitStateFeature，RegisterInitStateFeature的作用就是向UGameFrameworkComponentManager注册信息，信息包括哪个Actor，FeatureName是什么，组件地址信息，State状态, 函数代理等。信息存储在一个以Actor为Key的Map中，一定要知道UGameFrameworkComponentManager是一个Subsystem, 游戏内的所有的Actors都可以使用InitStates的功能。RegisterInitStateFeature调用后UGameFrameworkComponentManager存储的数据如下：
+   
+    ![ActorFeatureMap](./UE5ModularGameplayPic/ActorFeatureMap.png)
+4. 重载CanChangeInitState，当本组件尝试从A状态过渡到下一状态时，这里需要判断是否可以过渡，LyraHeroComponent在这里可以判断InputComponent和PlayerState是否有效
+
+5. 重载HandleChangeInitState，当本组件要从A状态过渡到下一状态时需要处理什么，这里可以执行初始化Input和Camera相关的，既然逻辑走到这里，肯定是CanChangeInitState要求的条件已经满足
+
+6. 重载OnActorInitStateChanged，当需要监听是否另外一个组件达到某一个状态时可以调用BindOnActorInitStateChanged, 当另外一个组件到达指定的状态后会调用OnActorInitStateChanged
+
+7. 重载CheckDefaultInitialization，一般情况下调用ContinueInitStateChain即可，ContinueInitStateChain会再次执行CanChangeInitState，HandleChangeInitState的检查逻辑，推动本组件的状态机继续状态切换
+   
+   ![ContinueInitStateChain](./UE5ModularGameplayPic/ContinueInitStateChain.png)
+
+#### LyraPawnExtensionComponent
+
+LyraPawnExtensionComponent它是初始化系统的总指挥，它从来不依赖其他Components的States, 其他的Components都要直接或者间接监听它的状态，比方说很重要的CharacterInited这个时刻，LyraPawnExtensionComponent需要查询绑定在本Actor的所有Components是否都GameplayReady了。LyraPawnExtensionComponent在实现的几个要点：
+
+1. 处理PlayerState, PlayerControllerChanged, PawnData, InputComponent等通用回调，处理的这些回调都是游戏内最通用的，跟具体逻辑无关
+
+2. CheckDefaultInitialization除了正常调用ContinueInitStateChain以外，还调用了CheckDefaultInitializationForImplementers，这个函数会调用这个Actors上所有继承IGameFrameworkInitStateInterface的Components的CheckDefaultInitialization(自己除外，否则死循环)
+
+    ![CheckDefaultInitializationForImplementers](./UE5ModularGameplayPic/CheckDefaultInitializationForImplementers.png)
+
+3. 调用BindOnActorInitStateChanged并且FeatureName为空，TODO
+
+
+
+
+
+
+
+
+
+
+PawnExtendionComponent不适合什么回调都往里放，不仅仅越来越臃肿，而且回调发生后会通知所有实现者都check, 一些完全不在乎这个数据的实现者也不得不check,PawnExtensionComponent适合一些基础数据的check,比如PlayerController和PlayerState
+
+
+TODO 总的流程图，标上序号，通过图看如何一步一步走流程的
+
+状态机更新的经典代码
+
+警告多个调用CheckDefaultInitializationForImplementers会进入死循环
 
 ## 总结
 
 简短的核心总结
+
+TODO PawnComponents以及其他
 
 ### 是什么
 
