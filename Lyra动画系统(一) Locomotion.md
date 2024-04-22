@@ -56,9 +56,10 @@ ABP_Mannequin_Base中的逻辑框架如下：
 
 相比较于4.17时的结构，现在的动画蓝图注重：
 
-* 拆，将部分PostProcess的逻辑拆到AnimBPPostProcess动画蓝图中去
+* 拆，包括将不同武器拆分到不同的动画蓝图中以及将部分PostProcess的逻辑拆到AnimBPPostProcess动画蓝图中去
 * 复用，利用TempleteAnimBP可以让不同骨架复用相同的动画蓝图逻辑
 * 可扩展，为了防止主蓝图内容臃肿，使用LinkAnimGraph功能将具体实现细节拆到不同Layers中去，扩展性强
+* 节省内存，LinkAnimGraph机制保证无关的动画资源不会加载到内存中
 
 ## Locomotion
 
@@ -74,6 +75,8 @@ ABP_Mannequin_Base中的逻辑框架如下：
 
 ### Functions的使用
 
+#### 案例1
+
 ![OnBecomeRelevant](./UE5LyraPic/OnBecomeRelevant.png)
 
 我们先以最简单的为例，Idle状态在随机时间后会进入到IdleBreak中，可以为枯燥的Idle加入一点随机动作，IdleBreaks数组中可以配置多个动画轮流播放，这里可以看到是在OnBecomeRelevant里面写了逻辑，取动画->SetSequence->CurrentIndex+1, 之所以放在OnBecomeRelevant中是希望这个节点开始'相关'时调用一次设置，后面Update期间不用再管。
@@ -82,11 +85,15 @@ ABP_Mannequin_Base中的逻辑框架如下：
 
 >_`注意：`由于多线程安全的缘故，不能在Functions里面调用不安全的随机函数，这里的技巧是获取当前角色的位置，(X+Y)%MaxNum计算所得。_
 
+#### 案例2
+
 ![OnUpdate](./UE5LyraPic/OnUpdate.png)
 
 这里使用OnUpdate而非OnBecomeRelevant的原因也很简单，是因为在Idle状态不变的情况下也会出现更换Sequence的情况，比如Crouch, 因此需要OnUpdate中时刻监视是否需要更换Sequence。
 
 >_`注意：`OnUpdate更改Sequence调用的是SetSequenceWithInertialBlending而不是SetSequence, 因为希望动画切换时能够平滑过渡。_
+
+#### 案例3
 
 ![SequenceEvaluator](./UE5LyraPic/SequenceEvaluator.png)
 
@@ -98,17 +105,46 @@ SequenceEvaluator与SequencePlayer最大的不同是SequencePlayer的动画是�
 
 Lyra中共有4个States用到了DistanceMatching，分别是Start, Stop, Pivot以及FallLand，接下来我们逐个分析下它们是如何使用DistanceMatching的。
 
-### Start
+动画资源准备：
+* 动画必须有RootMotion数据
+* 给动画添加上DistanceCurve相关的曲线数据，引擎中已经内置了DistanceCurveModifier
+* 动画的CurveCompressionSettings必须设置为UniformIndexable
 
-### Stop
+  ![来自games_inu推特](./UE5LyraPic/DistanceMatching.jpg)
 
-### Pivot
+#### Start
 
-### FallLand
+起步的核心函数是AdvanceTimeByDistanceMatching, 主要的参数如下：
+
+* DistanceTraveled: 移动的距离，始终 >= 0
+* DistanceCurveName: DistanceCurve曲线的名字
+* PlayRateClamp: PlayRate的区间，避免动画播放过快或者过慢
+
+主要的逻辑如下：
+
+![LyraDistanceMatchingStart](./UE5LyraPic/LyraDistanceMatching-Start.png)
+
+使用AdvanceTimeByDistanceMatching时不要预测将来的位置点(区别于Stop), 只跟移动的距离有关，简单总结就是：**提供了不按照DeltaTime而是按照移动距离(反算DeltaTime)去AdvanceTime的机制**
+
+在Start的UpdateStartAnim函数中，还有一些变量用于协调StrideWarping，比如StrideWarpingBlendInStartOffset和StrideWarpingBlendInDurationScaled，Start可能在刚开始的时候不希望StrideWarping早早的介入，在经过StrideWarpingBlendInStartOffset时间后StrideWarping再慢慢BlendIn进来，在接下来的StrideWarpingBlendInDurationScaled的时间里，BlendAlpha从0逐渐变为1，并且BlendAlpha从0逐渐变为1期间，PlayRateClamp也希望是逐渐过渡的。
+
+![StrideWarpingBlendIn](./UE5LyraPic/StrideWarpingBlendIn.png)
+
+#### Stop
+
+#### Pivot
+
+#### FallLand
+
+
+
 
 ### StrideWarping
 
 ### OrientationWarping
+
+
+
 
 ### TurnInPlace和RotateRootBone
 
