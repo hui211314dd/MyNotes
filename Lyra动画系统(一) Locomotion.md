@@ -108,6 +108,7 @@ Lyra中共有4个States用到了DistanceMatching，分别是Start, Stop, Pivot�
 动画资源准备：
 * 动画必须有RootMotion数据
 * 给动画添加上DistanceCurve相关的曲线数据，引擎中已经内置了DistanceCurveModifier
+* 起步动画的CurveValue是从0向一个**正值**变化，停步动画是从一个**负值**向0变化，而Pivot先从**负值**变向0，然后向**正值**变化，总之CurveValue一定是单调递增的
 * 动画的CurveCompressionSettings必须设置为UniformIndexable
 
   ![来自games_inu推特](./UE5LyraPic/DistanceMatching.jpg)
@@ -131,6 +132,16 @@ Lyra中共有4个States用到了DistanceMatching，分别是Start, Stop, Pivot�
 ![StrideWarpingBlendIn](./UE5LyraPic/StrideWarpingBlendIn.png)
 
 #### Stop
+
+停步的核心函数在于DistanceMatchToTarget，我们先看下停步时都发生了什么。
+
+1. 角色在跑动过程中，松开摇杆/键盘，角色的Pose如下：
+
+    ![DistanceMatchingStop1](./UE5LyraPic/DistanceMatchingStop1.png)
+
+2. 计算当当前速度，摩擦力，阻力系数等一系列条件下，位移的距离是多少，如下图所示，位移的距离为d, 会停在A点上。
+    ![DistanceMatchingStop1](./UE5LyraPic/DistanceMatchingStop2.png)
+
 
 #### Pivot
 
