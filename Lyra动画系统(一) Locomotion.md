@@ -114,6 +114,9 @@ Lyra中共有4个States用到了DistanceMatching，分别是Start, Stop, Pivot�
   ![来自games_inu推特](./UE5LyraPic/DistanceMatching.jpg)
 
 #### Start
+首先先看下StartAnimation中的CurveValue代表了什么含义，下图中CurveValue**从0变向一个正值，含义表示离出发点的距离**
+
+![StartDistanceCurve](./UE5LyraPic/StartDistanceCurve.png)
 
 起步的核心函数是AdvanceTimeByDistanceMatching, 主要的参数如下：
 
@@ -133,21 +136,34 @@ Lyra中共有4个States用到了DistanceMatching，分别是Start, Stop, Pivot�
 
 #### Stop
 
+下图可以看到，StopAnimation中的CurveValue从一个**负值变向0，含义表示离站定点的距离**
+
+![StopDistanceCurve](./UE5LyraPic/StopDistanceCurve.png)
+
 停步的核心函数在于DistanceMatchToTarget，我们先看下停步时都发生了什么。
 
 1. 角色在跑动过程中，松开摇杆/键盘，角色的Pose如下：
 
     ![DistanceMatchingStop1](./UE5LyraPic/DistanceMatchingStop1.png)
 
-2. 计算当当前速度，摩擦力，阻力系数等一系列条件下，位移的距离是多少，如下图所示，位移的距离为d, 会停在A点上。
-    ![DistanceMatchingStop1](./UE5LyraPic/DistanceMatchingStop2.png)
+2. 利用当前速度，摩擦力，阻力系数等一系列参数，计算位移的距离是多少，如下图所示，位移的距离为d, 会停在A点上。
+    ![DistanceMatchingStop2](./UE5LyraPic/DistanceMatchingStop2.png)
 
+3. 通过DistanceMatchToTarget函数可以查询到距离目标点d距离应该对应动画的哪一帧，如果下图所示，如果d=141, 那么对应的就是0.18s这一帧，DistanceMatchToTarget同时SequenceEvaluator设置到这一帧
+    ![DistanceMatchingStop3](./UE5LyraPic/DistanceMatchingStop3.png)
 
-#### Pivot
+4. 下次更新如果计算的位移距离大于0，则回到步骤2，否则的话不在使用DistanceMatchToTarget, 直接AdvanceTime即可
+
+>_步骤1和步骤3的Pose可能脚步相差很大，标准融合可能表现上会有些突兀，这里一个优化的方式是使用FastFeet的BlendProfile，使脚步能够快速融合_
+![FastFeet](./UE5LyraPic/FastFeet.png)
+
+至此，DistanceMatching的两个核心函数我们都使用过了，简单总结就是**离开站定位置的使用AdvanceTimeByDistanceMatching，去往站定位置的使用DistanceMatchToTarget**。
 
 #### FallLand
 
 
+
+#### Pivot
 
 
 ### StrideWarping
