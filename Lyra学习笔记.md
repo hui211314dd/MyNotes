@@ -25,3 +25,27 @@
    PropertyAccessSystem原理
    ModularGameplay解析，包括GameFrameworkComponentManager，UGameFrameworkComponent等，是什么，解决什么问题，怎么用等等
    CommonUser解析
+
+
+
+   ### UpperBody/LowerBody Split
+
+```
+├─root                         0
+├─ik-foot-root                 0
+├─ik-hand-root                 1
+├─pelvis                       0.1
+│  ├─spline-01                 0.2
+│  │  └─spline-02              0.3
+│  │      └─spline-03          0.4
+│  │        └─spline-04        0.5
+│  │          └─spline-05      0.6
+│  │            ├─clavicle-l   0.75
+│  │            │ └─*          1
+│  │            ├─clavicle-r   0.75
+│  │            │ └─*          1
+│  │            ├─neck01       0.75
+│  │            │ └─*          1
+│  └─thigh-l                   0
+│  └─thigh-r                   0
+```

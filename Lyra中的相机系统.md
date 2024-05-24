@@ -26,7 +26,54 @@ CameraSystem有几个要点：
 
 ### 流程图
 
-(PawnData中配置以及如何生效)
+![CameraModeInit](./LyraCameraPic/CameraModeInit.png)
+
+1. 正如在[UE5中的ModularGameplay](https://zhuanlan.zhihu.com/p/692606168)提到的，PawnReady的时候会设置Input, Ability，Camera相关的设置，这里只是注册了回调函数DetermineCameraMode，这个函数每帧会告诉LyraCameraComponent当前应该使用哪个CameraMode配置
+
+2. 每帧更新相机POV(PointofView)信息时都会从PlayerCameraManager::UpdateViewTarget开始
+
+3. 通过上面的CameraSystem流程图可以知道，POV的结果由角色身上CameraComponent::GetCameraView函数返回
+
+4. GetCameraView会调用到UpdateCameraModes, 这个函数会调用第1步时注册的代理函数，LyraCameraComponent就知道了这一帧要使用哪个CameraMode配置
+
+5. 第4步会返回CameraMode的Class, 这一步会NewObject这个CameraMode(如果还没有创建过)，并将这个实例放入CameraModeStack的栈顶
+
+6. CameraModeStack内部可能有多个CameraMode, 这一步会遍历所有的CameraMode并得到每一个CameraMode返回的POV, 再结合每个CameraMode的BlendWeight计算最终的POV
+
+7. 得到最终的POV后，将PlayerController的ControlRotation设置为返回的ControlRotation，同样将PlayerComponent的世界坐标设置为返回的结果，这样POV, ControlRotation和CameraComponent的Transform数据一致
+
+8. CameraSystem流程图中的后续流程，比如ViewTargetBlend等等
+
+
+
+
+### LyraCameraComponent
+
+>_CameraMode是用来数据驱动镜头的资源文件，后面会详细讲解LyraCameraMode, 这里只要知道CameraMode是镜头相关的设置即可_
+
+* DefaultCameraMode: DefaultCameraMode是LyraPawnData中的一个配置项，定义了角色在默认情况下的镜头规则，比如碰撞检测，FOV，Blend算法等等
+
+* AbilityCameraMode: 由技能系统在GA激活时设置，比如开镜或者死亡时
+  ![AbilityCameraMode](./LyraCameraPic/AbilityCameraMode.png)
+
+通过上面的流程图我们看下LyraPawnData和Ability中的镜头设置是如何参与进来的。
+
+上面的流程图可以看到，PlayerCameraManager每次更新时都会调用LyraHeroComponent的DetermineCameraMode函数，而这个函数的伪代码如下：
+
+```C++
+TSubclassOf<ULyraCameraMode> ULyraHeroComponent::DetermineCameraMode() const
+{
+	if (AbilityCameraMode)
+	{
+		return AbilityCameraMode;
+	}
+
+  //...
+  {
+    return PawnData->DefaultCameraMode;
+  }
+}
+```
 
 ### LyraCameraStack
 
