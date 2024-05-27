@@ -100,12 +100,17 @@ TSubclassOf<ULyraCameraMode> ULyraHeroComponent::DetermineCameraMode() const
   2. bUseRuntimeFloatCurves，TargetOffsetX，TargetOffsetY，TargetOffsetZ 类型为FRuntimeFloatCurve，与TargetOffsetCurve作用相同，只不过FRuntimeFloatCurve在PIE下存在bug，一旦这个bug解决后TargetOffsetCurve将会被移除
   3. CrouchOffsetBlendMultiplier，角色触发半蹲时可以控制镜头向下移动的快慢
 
-* 碰撞规则：
-
-
-#### LyraCameraMode_TopDownArenaCamera
+* 碰撞规则：正如上面所提到的，SpringArmComponent做的碰撞检测特别简单，在复杂地形下简单的规则容易导致镜头反复跳转，而这里可以配置1+n个检测射线，尽可能在复杂地形下也能找到合适的位置。
+  1. bPreventPenetration，是否要开启碰撞检测，默认为true
+  2. bDoPredictiveAvoidance，是否要使用多条检测线，如果false的话那么机制就跟SpringArmComponent一致了
+  3. CollisionPushOutDistance，做射线检测时为了避免射线在初始化位置就遭遇碰撞，一般会向胶囊体内部移动一小段距离
+  4. ReportPenetrationPercent，当触发碰撞的位置离角色很近的时候需要将这个消息通过ILyraCameraAssistInterface发送给感兴趣的Actor,方便做一些处理比如隐藏手枪等等
+  5. PenetrationBlendInTime，PenetrationBlendOutTime，参考下面LyraPenetrationAvoidanceFeeler
+  6. PenetrationAvoidanceFeelers，定义了多个碰撞检测的规则，参考下面PenetrationAvoidanceFeelers
 
 ### LyraPenetrationAvoidanceFeeler
+
+
 
 ## Lyra示例
 
