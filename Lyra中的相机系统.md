@@ -44,10 +44,19 @@ CameraSystem有几个要点：
 
 8. CameraSystem流程图中的后续流程，比如ViewTargetBlend等等
 
+我们以第三人称角色开镜举例, 流程图如下：
 
+![ADSExample](./LyraCameraPic/ADSExample.png)
 
+在虚幻提供的TPS模板中，角色身上需要挂载CameraComponent和SpringArmComponent，而在Lyra中只需挂载一个LyraCameraComponent即可。
 
 ### LyraCameraComponent
+
+LyraCameraComponent继承自CameraComponent，只不过它通过重载GetCameraView函数实现了一套Stack-CameraMode的模式，实现了更为精细的碰撞检测以及数据驱动，这对于Experiences想要实现的玩法可配置是很重要的。
+
+通过上面的流程图可以看到LyraCameraComponent的核心函数在于GetCameraView，我们看下它的实现细节：
+
+#### 决定这一帧使用哪个CameraMode
 
 >_CameraMode是用来数据驱动镜头的资源文件，后面会详细讲解LyraCameraMode, 这里只要知道CameraMode是镜头相关的设置即可_
 
@@ -56,7 +65,7 @@ CameraSystem有几个要点：
 * AbilityCameraMode: 由技能系统在GA激活时设置，比如开镜或者死亡时
   ![AbilityCameraMode](./LyraCameraPic/AbilityCameraMode.png)
 
-通过上面的流程图我们看下LyraPawnData和Ability中的镜头设置是如何参与进来的。
+我们看下LyraPawnData和Ability中的镜头设置是如何参与进来的。
 
 上面的流程图可以看到，PlayerCameraManager每次更新时都会调用LyraHeroComponent的DetermineCameraMode函数，而这个函数的伪代码如下：
 
@@ -75,11 +84,24 @@ TSubclassOf<ULyraCameraMode> ULyraHeroComponent::DetermineCameraMode() const
 }
 ```
 
-### LyraCameraStack
+因此我们可以知道，当技能中尝试修改镜头设置时优先使用AbilityCameraMode, 否则使用默认的DefaultCameraMode。
 
-### LyraCameraMode
+#### 将CameraMode压入栈顶以及Evaluate
+
+上面流程图里已经说明了。
 
 #### LyraCameraMode_ThirdPerson
+
+数据配置分为两大类：镜头Pitch调整位置规则和碰撞规则
+
+* Pitch调整位置规则：在没有任何碰撞的前提下，镜头Pitch不同则镜头偏移不同，这种规则不像SpringArmComponent只有一个数值控制，因此CameraComponent只能在一个半径为ArmLength的球体表面上移动，而LyraCameraMode_ThirdPerson的规则是先得到当前镜头的Pitch是多少，而且查表会得到一个(X，Y, Z), 我们还有当前的PivotLocation(可以理解为CharacterActorLocation)和PivotRotation(ControlRation), 最终的相机位置等于PivotLocation + PivotRotation.RotateVector(XYZ), 其实就是将XYZ应用到了PivotRotation的局部坐标系下。通过这个规则我们可以很轻易的实现比如过肩视角，椭圆表面等等，细节更为丰富。
+  
+  1. TargetOffsetCurve，类型为UCurveVector，横轴是Pitch，上面说的查表
+  2. bUseRuntimeFloatCurves，TargetOffsetX，TargetOffsetY，TargetOffsetZ 类型为FRuntimeFloatCurve，与TargetOffsetCurve作用相同，只不过FRuntimeFloatCurve在PIE下存在bug，一旦这个bug解决后TargetOffsetCurve将会被移除
+  3. CrouchOffsetBlendMultiplier，角色触发半蹲时可以控制镜头向下移动的快慢
+
+* 碰撞规则：
+
 
 #### LyraCameraMode_TopDownArenaCamera
 
