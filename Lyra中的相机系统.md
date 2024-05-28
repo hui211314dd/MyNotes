@@ -105,12 +105,30 @@ TSubclassOf<ULyraCameraMode> ULyraHeroComponent::DetermineCameraMode() const
   2. bDoPredictiveAvoidance，是否要使用多条检测线，如果false的话那么机制就跟SpringArmComponent一致了
   3. CollisionPushOutDistance，做射线检测时为了避免射线在初始化位置就遭遇碰撞，一般会向胶囊体内部移动一小段距离
   4. ReportPenetrationPercent，当触发碰撞的位置离角色很近的时候需要将这个消息通过ILyraCameraAssistInterface发送给感兴趣的Actor,方便做一些处理比如隐藏手枪等等
-  5. PenetrationBlendInTime，PenetrationBlendOutTime，参考下面LyraPenetrationAvoidanceFeeler
-  6. PenetrationAvoidanceFeelers，定义了多个碰撞检测的规则，参考下面PenetrationAvoidanceFeelers
+  5. PenetrationBlendInTime，PenetrationBlendOutTime，参考下面碰撞检测流程
+  6. PenetrationAvoidanceFeelers，定义了多个碰撞检测的规则，参考下面碰撞检测流程
 
-### LyraPenetrationAvoidanceFeeler
+### 相机位置流程
 
+TODO 补图即可
 
+### 碰撞检测流程
+
+UpdatePreventPenetration流程：
+
+![UpdatePreventPenetration](./LyraCameraPic/UpdatePreventPenetration.png)
+
+1. ClosestPointOnLineToCapsuleCenter, CapsuleCenter与相机射线上最近的点
+
+2. 整个Capsule表面距离ClosestPointOnLineToCapsuleCenter最近的点
+
+3. 对于2的临时位置做下处理，沿着1指向2的矢量方向平移一段距离，避免碰撞检测在起始位置就遭遇碰撞，得到的点就是碰撞检测的起始位置SafeLocation
+
+这里知道的条件是起始检测位置是SafeLocation, 终点检测位置是相机的位置
+
+>_这里注意SafeLocation并不在相机朝向的射线上，比如相机看向的是右肩，而SafeLocation在胶囊体内的一个位置点上_
+
+TODO PreventCameraPenetration
 
 ## Lyra示例
 
