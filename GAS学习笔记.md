@@ -12,3 +12,12 @@ PostGameplayEffectExecute(const FGameplayEffectModCallbackData & Data)仅在即�
 例如, 在样例项目中, 我们在这里从生命值Attribute中减去了最终的伤害值Meta Attribute, 如果有护盾值Attribute的话, 我们也会在减除生命值之前从护盾值中减除伤害值. 样例项目也在这里应用了被击打反应动画, 显示浮动的伤害数值和为击杀者分配经验值和赏金. 通过设计, 伤害值Meta Attribute总是会传递给即刻(Instant)GameplayEffect而不是Attribute Setter.
 
 ## GameEffect
+
+
+
+TODO
+1. GAS各个模块在网络游戏中的流程
+
+2. 什么是预测以及如何预测
+
+3. RootMotion的技能如何实现和同步
