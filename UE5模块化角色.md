@@ -43,5 +43,5 @@ AnimNode_CopyPoseFromMesh是这个方案的核心，这个节点的原理也特�
 
 ![FaceAcc](./UE5ModularCharacters/FaceAcc.png)
 
-
+![Fortnite](./UE5ModularCharacters/Fortnite骨架结构.png)
 
