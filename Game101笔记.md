@@ -338,3 +338,47 @@ TAA(Temporal Anti-Aliasing)的原理是利用相机抖动和历史帧信息来�
 
 DLSS的全称是Deep Learning Super Sampling，翻译成中文就是深度学习超级采样，它的作用是通过降低游戏内的渲染分辨率，同时再通过人工智能算法模型和AI加速硬件单元（Tensor Core）来拉伸输出画面，提高显示分辨率，例如使用1080P的渲染分辨率再通过AI算法和Tensor Core运算输出4K（2160P）的显示分辨率，以此来达成提升帧数的目的
 
+# （7）Shading 1 (Illumination, Shading and Graphics Pipeline)
+
+通过上面的步骤我们有很多三角形需要绘制，还肯定有若干些三角形发生重叠，那么最终某个像素是显示哪个三角形上的颜色呢？这就是处理可见性或者遮挡关系。
+
+## 画家算法
+
+从Z远处的地方开始画，然后画偏近的，重复这个过程。
+
+![画家算法](./Game101Pic/画家算法.PNG)
+
+需要先排序，然后又远到近开始画，n个三角形先按照z排序，算法复杂度O(nlg(n)), 但有一种情况无法处理：
+
+![画家算法无法处理的情况](./Game101Pic/画家算法无法处理的情况.PNG)
+
+这就引入了图形学常用的深度缓存算法
+
+## 深度缓存
+
+深度缓存算法有几个要点：
+
+1. 存储的是每个**像素**上的最小深度而不是三角形
+2. 运算过程中有两个buffers, 一个是framebuffer存储颜色值，一个是depthbuffer(z-buffer)存储最小深度值
+3. framebuffer和depthbuffer是同时生成的(framebuffer肯定要利用depthbuffer的数据决定最终颜色值)
+4. 为了简单，我们约定buffer中存储的都是正值，并且越小说明离相机越近
+
+framebuffer和depthbuffer最终生成的效果图：
+
+![FrameBuffer和DepthBuffer](./Game101Pic/FrameBuffer和DepthBuffer.PNG)
+
+深度缓存伪代码如下，可以看到framebuffer正是利用深度缓存才能确定最终这个像素点最终的颜色值：
+
+![深度缓存伪代码](./Game101Pic/深度缓存伪代码.PNG)
+
+一个示例：
+
+![深度缓存示例](./Game101Pic/深度缓存示例.PNG)
+
+深度缓存的几个特点：
+1. 算法复杂度为O(n),因为一个三角形可覆盖的像素点是常量，n个三角形需要判断的次数为常量*n
+2. 算法无序也是表现正确的，因此不用提前排序
+3. GPU硬件都会实现深度缓存算法
+
+>_注意：如果反走样使用了类似MSAA算法的话，在做深度缓存的时候也需要考虑这些采样点而不是单个像素了_
+
