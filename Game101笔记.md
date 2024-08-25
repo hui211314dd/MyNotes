@@ -477,14 +477,14 @@ framebuffer和depthbuffer最终生成的效果图：
   ![GouraudShading](./Game101Pic/GouraudShading.PNG)
   >_点的法线如何计算，一个点会紧挨着几个面，可以求这些面的法线和然后求平均即可(也可以使用面的面积加权)_
 
-* Fhong Shading, 计算每个像素点的法线，然后对每个**像素**着色；
-  ![FlatShading](./Game101Pic/FlatShading.PNG)
+* Phong Shading, 计算每个像素点的法线，然后对每个**像素**着色；
+  ![PhongShading](./Game101Pic/PhongShading.PNG)
   >_像素点的法线如何计算，顶点的法线可以知道，然后三角形内部每个顶点的法线可以通过重心坐标所得_
 
 
-* 当模型简单时，FhongShading有着更好的结果，但性能也更差；
+* 当模型简单时，PhongShading有着更好的结果，但性能也更差；
 * 当三角面足够多时，三种着色效果差不多；
-* 当模型特别复杂时，甚至三角面数比像素点还要多，那FlatShading的性能可能比FhongShading还要差；
+* 当模型特别复杂时，甚至三角面数比像素点还要多，那FlatShading的性能可能比PhongShading还要差；
 ![着色频率的对比](./Game101Pic/着色频率的对比.PNG)
 
 ## 实时渲染管线
@@ -563,3 +563,38 @@ framebuffer和depthbuffer最终生成的效果图：
 ![贴图可以被多次填充](./Game101Pic/贴图可以被多次填充.PNG)
 
 ![TiledTextures](./Game101Pic/TiledTextures.PNG)
+
+# （9）Shading 3 (Texture Mapping cont.)
+
+## Barycentric Coordinates(重心坐标)
+
+**重心坐标的目的就是做三角形内的属性插值**
+
+* 为什么需要三角形内插值？上节可以看到很多属性都是在顶点上定义的；
+* 需要插值哪些属性？UV坐标(纹理映射)，颜色值(GouraudShading)或者法线向量(PhongShading)等
+* 如何插值？利用重心坐标
+
+重心坐标的定义要点：
+1. 重心坐标是定义在三角形上的，给出一个三角形有一套重心坐标，换一个三角形另外一套重心坐标；
+2. 三角形内任何一点都可以表示成三个顶点的线性组合，即任何一点(x, y) = aA + bB + rC, 同时满足a+b+r=1, 并且a,b,r >= 0;
+3. 满足条件后，a,b,r就是点(x,y)在这个三角形内的重心坐标表示，即给定一个三角形，并且给出一个点的重心坐标就可以求出这个点的位置；
+
+![BarycentricCoordinates](./Game101Pic/BarycentricCoordinates.PNG)
+
+重心坐标a,b,r可以通过面积比求出；
+
+![重心坐标可以通过面积比求出](./Game101Pic/重心坐标可以通过面积比求出.PNG)
+
+三角形的重心即a,b,r=1/3的点；
+
+![三角形的重心](./Game101Pic/三角形的重心.PNG)
+
+给出三角形的三个顶点位置以及三角形内任意点位置(x,y)求出a,b,r
+
+![重心坐标公式](./Game101Pic/重心坐标公式.PNG)
+
+有了重心坐标的概念后我们要对属性插值了，下面公式我们知道V=aV(A)+bV(B)+rV(C), 重心坐标定义时V(ABC)都是位置属性，我们可以改为UV属性，颜色，法线，深度等属性信息，有了点的重心坐标，可以对任何属性插值；
+
+![使用重心坐标对属性插值](./Game101Pic/使用重心坐标对属性插值.PNG)
+
+>_警告：三维空间内一个三角形内一个点计算好的重心坐标与通过投影变换后得到的重心坐标有可能是不同的，因此一般会先变换回三维空间然后对其属性插值，老师以深度属性举例_
