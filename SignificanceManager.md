@@ -46,6 +46,7 @@ CMSignificanceManager.h
 #pragma once
 
 #include "CoreMinimal.h"
+#include "OrderedBudget.h"
 #include "SignificanceManager.h"
 #include "CMSignificanceManager.generated.h"
 
@@ -106,7 +107,8 @@ public:
 		
 		EPostSignificanceType PostSignificanceType = EPostSignificanceType::None;
 		TUniquePtr<FSignificanceTypeData> Data;
-		
+
+		struct FOrderedBudget Budget;
 		//add-on update functions (not part of base significance manager functionality)
 		FPreUpdateFunction PreUpdateFunction;
 		FPostUpdateFunction PostUpdateFunction;
@@ -143,6 +145,7 @@ public:
 	//This is the function that users call as a replacement for the virtual RegisterObject which exposes only the significance type so it can be looked up
 	void RegisterSignificanceObject(UObject* Object, ECmSignificanceType SignificanceType);
 
+	FSignificanceTypeInfo* GetSignificanceTypeInfo(ECmSignificanceType SignificanceType);
 private:
 	float ElapsedTime;
 
@@ -275,6 +278,12 @@ void UCMSignificanceManager::RegisterSignificanceObject(UObject* Object, ECmSign
 }
 
 
+
+UCMSignificanceManager::FSignificanceTypeInfo* UCMSignificanceManager::GetSignificanceTypeInfo(
+	ECmSignificanceType SignificanceType)
+{
+	return &SignificanceTypeInfo[(uint8)SignificanceType];
+}
 
 void UCMSignificanceManager::Update(TArrayView<const FTransform> Viewpoints)
 {
