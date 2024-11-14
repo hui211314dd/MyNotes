@@ -50,19 +50,28 @@ CMSignificanceManager.h
 #include "SignificanceManager.h"
 #include "CMSignificanceManager.generated.h"
 
+/**
+ * 创建新类型：
+ * Step 0: 创建ECmSignificanceType新类型；
+ * Step 1: 创建FSignificanceTypeData的子类(可选)；
+ * Step 2: 创建FManagedObjectInfo的子类；
+ * Step 3: 实现DefaultSignificance(计算得分)和DefaultPostSignificanceUpdate(根据得分排序结果按高到低分配LOD)函数；
+ * Step 4: 在UCMSignificanceManager构造函数里注册；
+ * Step5:  在RegisterSignificanceObject中处理;
+ */
+
+
+UENUM(BlueprintType)
 enum class ECmSignificanceType : uint8
 {
-	// 
-	BigWorld_SimObjectDefault,
+	// 对应大世界中所有的Pawns
+	BigWorld_PawnDefault,
 
-	// 对应大世界中有实体Actor的NPCs
-	BigWorld_NPCDefault,
-
-	// 对应大世界的所有城市
-	BigWorld_CityDefault,
-
+	// 对应大世界的所有静态物体，包括City, Mine等；
+	BigWorld_StaticDefault,
+	
 	// 非战斗场景的NPCs
-	NonBattleScene_NPCDefault,
+	NonBattleScene_PawnDefault,
 
 	// 战斗场景步兵
 	BattleScene_InfantryDefault,
@@ -70,7 +79,7 @@ enum class ECmSignificanceType : uint8
 	// 战斗场景骑兵
 	BattleScene_DragoonDefault,
 
-	Max,
+	Max    UMETA(DisplayName="Invalid"),
 };
 
 /**
@@ -89,11 +98,11 @@ public:
 	{};
 
 	// Define Type Data Begin
-	struct FBigWorldSimObjectDefaultSignificanceTypeData: public FSignificanceTypeData
+	struct FBigWorldPawnDefaultSignificanceTypeData: public FSignificanceTypeData
 	{
 		float MyData;
 
-		FBigWorldSimObjectDefaultSignificanceTypeData(): MyData(1.0f){}
+		FBigWorldPawnDefaultSignificanceTypeData(): MyData(1.0f){}
 	};
 	
 	typedef TFunction<void(UCMSignificanceManager*)> FPreUpdateFunction;
@@ -118,21 +127,40 @@ public:
 
 	// Define Object Data Begin
 
-	struct FBigWorldSimObjectInfo : public USignificanceManager::FManagedObjectInfo
+	struct FBigWorldPawnInfo : public USignificanceManager::FManagedObjectInfo
 	{
 	public:
-		FBigWorldSimObjectInfo(UObject* InObject, FName InTag): USignificanceManager::FManagedObjectInfo(InObject, InTag, &BigWorldSimObjectDefaultSignificance,
-			USignificanceManager::EPostSignificanceType::Sequential, &BigWorldSimObjectDefaultPostSignificance), SignificanceLOD(0)
+		FBigWorldPawnInfo(UObject* InObject, FName InTag): USignificanceManager::FManagedObjectInfo(InObject, InTag, &BigWorldPawnDefaultSignificance,
+			USignificanceManager::EPostSignificanceType::Sequential, &BigWorldPawnDefaultPostSignificance), SignificanceLOD( -1 )
 		{}
 
 		int32 GetSignificanceLOD() const { return SignificanceLOD; }
 
-		static float BigWorldSimObjectDefaultSignificance(const FManagedObjectInfo* ObjectInfo, const FTransform& Viewpoint);
-		static void BigWorldSimObjectDefaultPostSignificance(const FManagedObjectInfo* ObjectInfo, float OldSignificance, float NewSignificance, bool bFinal);
+		static float BigWorldPawnDefaultSignificance(const FManagedObjectInfo* ObjectInfo, const FTransform& Viewpoint);
+		static void BigWorldPawnDefaultPostSignificance(const FManagedObjectInfo* ObjectInfo, float OldSignificance, float NewSignificance, bool bFinal);
 
 		//add-on handling for pre-post update operations
-		static void BigWorldSimObjectDefaultPreSignificanceUpdate(UCMSignificanceManager* SignificanceManager);
-		static void BigWorldSimObjectDefaultPostSignificanceUpdate(UCMSignificanceManager* SignificanceManager);
+		static void BigWorldPawnDefaultPreSignificanceUpdate(UCMSignificanceManager* SignificanceManager);
+		static void BigWorldPawnDefaultPostSignificanceUpdate(UCMSignificanceManager* SignificanceManager);
+	public:
+		int32 SignificanceLOD;
+	};
+
+	struct FBigWorldStaticInfo : public USignificanceManager::FManagedObjectInfo
+	{
+	public:
+		FBigWorldStaticInfo(UObject* InObject, FName InTag): USignificanceManager::FManagedObjectInfo(InObject, InTag, &BigWorldStaticDefaultSignificance,
+			USignificanceManager::EPostSignificanceType::Sequential, &BigWorldStaticDefaultPostSignificance), SignificanceLOD( -1 )
+		{}
+
+		int32 GetSignificanceLOD() const { return SignificanceLOD; }
+
+		static float BigWorldStaticDefaultSignificance(const FManagedObjectInfo* ObjectInfo, const FTransform& Viewpoint);
+		static void BigWorldStaticDefaultPostSignificance(const FManagedObjectInfo* ObjectInfo, float OldSignificance, float NewSignificance, bool bFinal){};
+
+		//add-on handling for pre-post update operations
+		static void BigWorldStaticDefaultPreSignificanceUpdate(UCMSignificanceManager* SignificanceManager){};
+		static void BigWorldStaticDefaultPostSignificanceUpdate(UCMSignificanceManager* SignificanceManager);
 	public:
 		int32 SignificanceLOD;
 	};
@@ -145,14 +173,10 @@ public:
 	//This is the function that users call as a replacement for the virtual RegisterObject which exposes only the significance type so it can be looked up
 	void RegisterSignificanceObject(UObject* Object, ECmSignificanceType SignificanceType);
 
-	FSignificanceTypeInfo* GetSignificanceTypeInfo(ECmSignificanceType SignificanceType);
+	static FSignificanceTypeInfo* GetSignificanceTypeInfo(ECmSignificanceType SignificanceType);
 private:
 	float ElapsedTime;
-
-	//static storage of all the significance handling data
-	UCMSignificanceManager::FSignificanceTypeInfo SignificanceTypeInfo[(uint8)ECmSignificanceType::Max];
 };
-
 
 ```
 
@@ -164,14 +188,31 @@ CMSignificanceManager.cpp
 
 
 #include "GameManager/CMSignificanceManager.h"
+#include "Simulator/Actors/MBSimBaseMovableActor.h"
+#include "Simulator/Actors/MBSimEditorActor.h"
 
-static float GcmSignificanceManagerTickIntervalTime = 0;
+static float GcmSignificanceManagerTickIntervalTime = 1.0f;
 static FAutoConsoleVariableRef CVarSignificanceManagerTickIntervalTime(
 	TEXT("CMSigMan.TickIntervalSeconds"),
 	GcmSignificanceManagerTickIntervalTime,
 	TEXT("0 means call update function per frame.\n"),
 	ECVF_Default
 	);
+
+static TAutoConsoleVariable<FString> CVarBigWorldPawnBudgetSpecification(
+	TEXT("CMSigMan.BigWorldPawnBudgetSpecification"),
+	TEXT("1,8,15"),
+	TEXT("Level0Num,Level1Num,Level2Num,Level3Num..."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<FString> CVarBigWorldStaticBudgetSpecification(
+	TEXT("CMSigMan.BigWorldStaticBudgetSpecification"),
+	TEXT("5,5,50"),
+	TEXT("Level0Num,Level1Num,Level2Num,Level3Num..."),
+	ECVF_Default);
+
+//static storage of all the significance handling data
+static UCMSignificanceManager::FSignificanceTypeInfo SignificanceTypeInfo[(uint8)ECmSignificanceType::Max];
 
 UCMSignificanceManager::UCMSignificanceManager()
 	:Super()
@@ -180,33 +221,57 @@ UCMSignificanceManager::UCMSignificanceManager()
 
 	if (IsTemplate() /*Only populate static struct in the CDO*/)
 	{
-		FSignificanceTypeInfo& SimObjectDefaultInfo = SignificanceTypeInfo[(uint8)ECmSignificanceType::BigWorld_SimObjectDefault];
-		SimObjectDefaultInfo.Tag = "BigWorld.SimObjectDefault";
+		FSignificanceTypeInfo& PawnDefaultInfo = SignificanceTypeInfo[(uint8)ECmSignificanceType::BigWorld_PawnDefault];
+		PawnDefaultInfo.Tag = "BigWorld.PawnDefault";
 		//can leave significance functions unmodified if they aren't used...
-		SimObjectDefaultInfo.PostSignificanceType = EPostSignificanceType::Sequential;
-		SimObjectDefaultInfo.Data = MakeUnique<FBigWorldSimObjectDefaultSignificanceTypeData>();
+		PawnDefaultInfo.PostSignificanceType = EPostSignificanceType::Sequential;
+		PawnDefaultInfo.Data = MakeUnique<FBigWorldPawnDefaultSignificanceTypeData>();
+		// 支持不同手机型号不同设置
+		PawnDefaultInfo.Budget.RecreateBudget(CVarBigWorldPawnBudgetSpecification.GetValueOnAnyThread());
 		//Also register update functions, if they exist for this tag
-		SimObjectDefaultInfo.PreUpdateFunction = &FBigWorldSimObjectInfo::BigWorldSimObjectDefaultPreSignificanceUpdate;
-		SimObjectDefaultInfo.PostUpdateFunction = &FBigWorldSimObjectInfo::BigWorldSimObjectDefaultPostSignificanceUpdate;
+		PawnDefaultInfo.PreUpdateFunction = &FBigWorldPawnInfo::BigWorldPawnDefaultPreSignificanceUpdate;
+		PawnDefaultInfo.PostUpdateFunction = &FBigWorldPawnInfo::BigWorldPawnDefaultPostSignificanceUpdate;
+
+		FSignificanceTypeInfo& StaticDefaultInfo = SignificanceTypeInfo[(uint8)ECmSignificanceType::BigWorld_StaticDefault];
+		StaticDefaultInfo.Tag = "BigWorld.StaticDefault";
+		//can leave significance functions unmodified if they aren't used...
+		StaticDefaultInfo.PostSignificanceType = EPostSignificanceType::Sequential;
+		// 支持不同手机型号不同设置
+		StaticDefaultInfo.Budget.RecreateBudget(CVarBigWorldStaticBudgetSpecification.GetValueOnAnyThread());
+		//Also register update functions, if they exist for this tag
+		StaticDefaultInfo.PreUpdateFunction = &FBigWorldStaticInfo::BigWorldStaticDefaultPreSignificanceUpdate;
+		StaticDefaultInfo.PostUpdateFunction = &FBigWorldStaticInfo::BigWorldStaticDefaultPostSignificanceUpdate;
 	}
 }
 
 // Calculate significance based on distance and other factors
-float UCMSignificanceManager::FBigWorldSimObjectInfo::BigWorldSimObjectDefaultSignificance(
+float UCMSignificanceManager::FBigWorldPawnInfo::BigWorldPawnDefaultSignificance(
 	const FManagedObjectInfo* ObjectInfo, const FTransform& Viewpoint)
 {
-	/*
-	* FPlayerPawnObjectInfo* PlayerInfo = static_cast<FPlayerPawnObjectInfo*>(ObjectInfo);
-		
-		// Grab any data from the actor we may need here
-		const APlayerPawn* PlayerPawn = CastChecked<const APlayerPawn>(GetObject());
+	const UCMSignificanceManager::FBigWorldPawnInfo* PlayerInfo = static_cast<const UCMSignificanceManager::FBigWorldPawnInfo*>(ObjectInfo);
+
+	// Grab any data from the actor we may need here
+	const AMBSimBaseMovableActor* PlayerPawn = CastChecked<const AMBSimBaseMovableActor>(ObjectInfo->GetObject());
  
-		// You can have conditions here to force max significance based on the pawn properties (eg. they're the local player).
- 
-		// Calculate significance based on things like distance or whatever makes sense for your project.
-		return CalculateSignificanceForDistance(...);
-	 */
-	return 0;
+	// You can have conditions here to force max significance based on the pawn properties (eg. they're the local player).
+	if (PlayerPawn->IsLocalPlayer())
+	{
+		return MAX_FLT;
+	}
+	
+	// Calculate significance based on things like distance or whatever makes sense for your project.
+	// 判断标准：IsVisible(第一考虑) + 距离(第二考虑)
+	float FinalScore = 0;
+	if(PlayerPawn->WasRecentlyRenderedOnScreen(0.2f) || PlayerPawn->IsVisible() )
+	{
+		FinalScore += 1000000000;
+	}
+
+	const float DistanceSquared2D = FVector::DistSquared2D(PlayerPawn->GetActorLocation(), Viewpoint.GetLocation());
+	// 分数与距离成反比
+	FinalScore += FMath::GetMappedRangeValueClamped(FVector2f(0, 2500000000.0f), FVector2f(500000000, 0), DistanceSquared2D);
+	
+	return FinalScore;
 }
 
 // This is called per-object by USignificanceManager::Update after the significance values have been calculated.
@@ -214,13 +279,13 @@ float UCMSignificanceManager::FBigWorldSimObjectInfo::BigWorldSimObjectDefaultSi
 // Or you can run it sequentially, see EPostSignificanceType.
 // 
 // If the order of the actors doesn't matter then it's better to use this than the PostUpdate above as it removes a level of indirection.
-void UCMSignificanceManager::FBigWorldSimObjectInfo::BigWorldSimObjectDefaultPostSignificance(
+void UCMSignificanceManager::FBigWorldPawnInfo::BigWorldPawnDefaultPostSignificance(
 	const FManagedObjectInfo* ObjectInfo, float OldSignificance, float NewSignificance, bool bFinal)
 {
 }
 
 // Called once in UMySignificanceManager::Update before USignificanceManager::Update runs.
-void UCMSignificanceManager::FBigWorldSimObjectInfo::BigWorldSimObjectDefaultPreSignificanceUpdate(
+void UCMSignificanceManager::FBigWorldPawnInfo::BigWorldPawnDefaultPreSignificanceUpdate(
 	UCMSignificanceManager* SignificanceManager)
 {
 	// This is a good place to pre-calcuate any common data you may need during the per-object significance calculations so you can avoid doing them for every object. You likely won't need this though.
@@ -229,43 +294,88 @@ void UCMSignificanceManager::FBigWorldSimObjectInfo::BigWorldSimObjectDefaultPre
 // Called once in UMySignificanceManager::Update after USignificanceManager::Update runs.
 // The key difference between this function and the PostSignificance function you give to FManagedObject is this is called
 // after USignificanceManager has sorted the list by significance.
-void UCMSignificanceManager::FBigWorldSimObjectInfo::BigWorldSimObjectDefaultPostSignificanceUpdate(
+void UCMSignificanceManager::FBigWorldPawnInfo::BigWorldPawnDefaultPostSignificanceUpdate(
 	UCMSignificanceManager* SignificanceManager)
 {
 	// This is where we apply the Significance LOD to each player.
 	// We define these as basically a large list of ints where there is 1 entry per player, then we use the player's index in the sorted list that USignificanceManager::Update created to lookup their Significance LOD in that list.
-/*
-	const UCMSignificanceManager::FSignificanceTypeInfo* PlayerTypeInfo = UCMSignificanceManager::GetSignificanceTypeInfo(EMyProjectSignificanceType::Player);
+	const UCMSignificanceManager::FSignificanceTypeInfo* PlayerTypeInfo = UCMSignificanceManager::GetSignificanceTypeInfo(ECmSignificanceType::BigWorld_PawnDefault);
 	const TArray<USignificanceManager::FManagedObjectInfo*>& ManagedPlayers = SignificanceManager->GetManagedObjects(PlayerTypeInfo->Tag);
  
 	// Loop over the list of players, sorted by significance.
 	for (int32 SignificanceIndex = 0; SignificanceIndex < ManagedPlayers.Num(); ++SignificanceIndex)
 	{
 		// Budget is an FOrderedBudget which is an engine type.
-		const int32 SignificanceLOD = PlayerTypeInfo->Budget.GetBudgetForIndex(SignificanceIndex);
+		// SignificanceLOD为逻辑LOD, 以0开始
+		const int32 NewSignificanceLOD = PlayerTypeInfo->Budget.GetBudgetForIndex(SignificanceIndex);
  
-		FPlayerPawnObjectInfo* PlayerInfo = Cast<FPlayerPawnObjetInfo>(ManagedPlayers[SignificanceIndex]);
-			
+		const FBigWorldPawnInfo* ConstPlayerInfo = static_cast<const FBigWorldPawnInfo*>(ManagedPlayers[SignificanceIndex]);
+		FBigWorldPawnInfo* PlayerInfo = const_cast<FBigWorldPawnInfo*>(ConstPlayerInfo);
+		
 		// 6. Notify the pawn about the new significance LOD value.
-		APlayerPawn* PlayerPawn = static_cast<APlayerPawn*>(GetObject());
+		AMBSimBaseMovableActor* PlayerPawn = static_cast<AMBSimBaseMovableActor*>(PlayerInfo->GetObject());
 		if (NewSignificanceLOD != PlayerInfo->SignificanceLOD)
 		{
-			PlayerPawn->ApplySignificanceLOD(this);
 			PlayerInfo->SignificanceLOD = NewSignificanceLOD;
+			// TODO ApplySignificanceLOD可以提到一个接口里
+			PlayerPawn->ApplySignificanceLOD(NewSignificanceLOD);
 		}
 	}
-*/
+}
+
+float UCMSignificanceManager::FBigWorldStaticInfo::BigWorldStaticDefaultSignificance(
+	const FManagedObjectInfo* ObjectInfo, const FTransform& Viewpoint)
+{
+	// Grab any data from the actor we may need here
+	const AActor* CurActor = CastChecked<const AActor>(ObjectInfo->GetObject());
+	
+	// Calculate significance based on things like distance or whatever makes sense for your project.
+	// 判断标准：距离
+	float FinalScore = 0;
+	
+	const float DistanceSquared2D = FVector::DistSquared2D(CurActor->GetActorLocation(), Viewpoint.GetLocation());
+	// 分数与距离成反比
+	FinalScore += FMath::GetMappedRangeValueClamped(FVector2f(0, 2500000000.0f), FVector2f(500000000, 0), DistanceSquared2D);
+	
+	return FinalScore;
+}
+
+void UCMSignificanceManager::FBigWorldStaticInfo::BigWorldStaticDefaultPostSignificanceUpdate(
+	UCMSignificanceManager* SignificanceManager)
+{
+	// This is where we apply the Significance LOD to each player.
+	// We define these as basically a large list of ints where there is 1 entry per player, then we use the player's index in the sorted list that USignificanceManager::Update created to lookup their Significance LOD in that list.
+	const UCMSignificanceManager::FSignificanceTypeInfo* StaticTypeInfo = UCMSignificanceManager::GetSignificanceTypeInfo(ECmSignificanceType::BigWorld_StaticDefault);
+	const TArray<USignificanceManager::FManagedObjectInfo*>& ManagedPlayers = SignificanceManager->GetManagedObjects(StaticTypeInfo->Tag);
+ 
+	// Loop over the list of players, sorted by significance.
+	for (int32 SignificanceIndex = 0; SignificanceIndex < ManagedPlayers.Num(); ++SignificanceIndex)
+	{
+		// Budget is an FOrderedBudget which is an engine type.
+		// SignificanceLOD为逻辑LOD, 以0开始
+		const int32 NewSignificanceLOD = StaticTypeInfo->Budget.GetBudgetForIndex(SignificanceIndex);
+ 
+		const FBigWorldStaticInfo* ConstStaticInfo = static_cast<const FBigWorldStaticInfo*>(ManagedPlayers[SignificanceIndex]);
+		FBigWorldStaticInfo* StaticInfo = const_cast<FBigWorldStaticInfo*>(ConstStaticInfo);
+		
+		// 6. Notify the pawn about the new significance LOD value.
+		AMBSimEditorActor* CurStaticActor = static_cast<AMBSimEditorActor*>(StaticInfo->GetObject());
+		if (NewSignificanceLOD != StaticInfo->SignificanceLOD)
+		{
+			StaticInfo->SignificanceLOD = NewSignificanceLOD;
+			// TODO ApplySignificanceLOD可以提到一个接口里
+			CurStaticActor->ApplySignificanceLOD(NewSignificanceLOD);
+		}
+	}
 }
 
 void UCMSignificanceManager::RegisterSignificanceObject(UObject* Object, ECmSignificanceType SignificanceType)
 {
 	check(SignificanceType != ECmSignificanceType::Max);
 
-	// TODO 处理没有注册的情况；
-	
 	const FSignificanceTypeInfo& Info = SignificanceTypeInfo[(uint8)SignificanceType];
 
-	if (SignificanceType == ECmSignificanceType::BigWorld_SimObjectDefault)
+	if (SignificanceType == ECmSignificanceType::BigWorld_PawnDefault)
 	{
 		// UMyTag1Object* MyTag1Object = CastChecked<UMyTag1Object>(Object);
 		// if (!MyTag1Object->ShouldManageSignificance() /* || some other checks */)
@@ -273,11 +383,19 @@ void UCMSignificanceManager::RegisterSignificanceObject(UObject* Object, ECmSign
 		// 	return;
 		// }
 		
-		RegisterManagedObject(new FBigWorldSimObjectInfo(Object, Info.Tag));
+		RegisterManagedObject(new FBigWorldPawnInfo(Object, Info.Tag));
+	}
+	else if (SignificanceType == ECmSignificanceType::BigWorld_StaticDefault)
+	{
+		RegisterManagedObject(new FBigWorldStaticInfo(Object, Info.Tag));
+	}
+	else
+	{
+		check(0);
 	}
 }
 
-
+//---------------------------------新增新类型时下面的代码不用动----------------------------------------------
 
 UCMSignificanceManager::FSignificanceTypeInfo* UCMSignificanceManager::GetSignificanceTypeInfo(
 	ECmSignificanceType SignificanceType)
@@ -287,6 +405,8 @@ UCMSignificanceManager::FSignificanceTypeInfo* UCMSignificanceManager::GetSignif
 
 void UCMSignificanceManager::Update(TArrayView<const FTransform> Viewpoints)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(UCMSignificanceManager::Update)
+	
 	if (!FMath::IsNearlyZero(GcmSignificanceManagerTickIntervalTime))
 	{
 		ElapsedTime += GetWorld()->GetDeltaSeconds();
