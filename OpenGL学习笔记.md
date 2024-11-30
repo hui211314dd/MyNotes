@@ -58,7 +58,25 @@ glBindBuffer(GL_ARRAY_BUFFER, VBO);
 
 ## 着色器
 
+### 顶点属性上限
 
+每个输入变量也叫顶点属性(Vertex Attribute)。我们能声明的顶点属性是有上限的，它一般由硬件来决定。OpenGL确保至少有16个包含4分量的顶点属性可用，但是有些硬件或许允许更多的顶点属性，你可以查询GL_MAX_VERTEX_ATTRIBS来获取具体的上限：
+
+```C++
+int nrAttributes;
+glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &nrAttributes);
+std::cout << "Maximum nr of vertex attributes supported: " << nrAttributes << std::endl;
+```
+
+通常情况下它至少会返回16个，大部分情况下是够用了。
+
+### Uniform属性上限
+
+OpenGL限制了它能够处理的uniform数量，这可以通过GL_MAX_VERTEX_UNIFORM_COMPONENTS来查询。
+
+### Vector支持Swizzling
+
+即vector支持类似vec.xxx, vec.xyz, vec.yyz, vec.zyx等操作;
 
 ## 纹理
 
