@@ -229,11 +229,15 @@ UI为W_WeaponReticleHost
 
 ## Lyra对比传统方案的优势以及不足
 
-数据驱动的优势，利用Stack-CameraMode模式，玩法可以动态替换而不用替换或者修改CameraComponent。
+SpringArm方案中，相机和Character是强绑定，游戏中经常出现强制旋转角色的需求，这时候相机会有一两帧的抖动, 而Lyra方案则更为灵活；
 
-Feeler对比SpringArm的优势，对于复杂地形更加稳定
+>_调用完Character::SetRotation后再调用SpringArmComponent->TickComponent(0, ELevelTick::LEVELTICK_All, nullptr)可以解决这个问题_
 
-不足是代码处于半成品，很多bug以及TODO
+数据驱动的优势，利用Stack-CameraMode模式，玩法可以动态替换而不用替换或者修改CameraComponent；
+
+Feeler对比SpringArm的优势，对于复杂地形更加稳定；
+
+不足是代码处于半成品，很多bug以及TODO；
 
 ## 总结
 
@@ -241,3 +245,6 @@ Feeler对比SpringArm的优势，对于复杂地形更加稳定
 1. Feeler方式
 2. CameraStack和CameraMode模式，DataDriven，有数据驱动的优势，可配置在Experiences中
 3. 有些可惜代码在开发中，还有很多需要填补的
+4. [Modular Camera Dynamics](https://www.fab.com/listings/175bb327-880f-4fdc-b1e7-e2e866f74efb)视乎也是一种不错的选择
+
+(添加视频)
