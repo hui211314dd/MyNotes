@@ -154,6 +154,78 @@ DataTableRow设置如下：
 
 资源收集依赖AssetRegistry模块,属性匹配依赖反射机制,这些代码都可以在UFlibAssetParseHelper中找到;
 
+```C++
+// 资源收集：
+IAssetRegistry& UFlibAssetParseHelper::GetAssetRegistry(bool bSearchAllAssets)
+{
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+	if(bSearchAllAssets)
+	{
+		AssetRegistryModule.Get().SearchAllAssets(true);
+	}
+	return AssetRegistryModule.Get();
+}
+
+TArray<FAssetData> UFlibAssetParseHelper::GetAssetsByFilters(const TArray<FTopLevelAssetPath>& AssetTypes,
+                                                             const TArray<FString>& FilterPaths, bool bRecursiveClasses)
+{
+	TArray<FAssetData> result;
+	if(FilterPaths.Num())
+	{
+		FARFilter Filter;
+		Filter.PackagePaths.Append(FilterPaths);
+		Filter.ClassPaths.Append(AssetTypes);
+		Filter.bRecursivePaths = true;
+		Filter.bRecursiveClasses = bRecursiveClasses;
+		
+		UFlibAssetParseHelper::GetAssetRegistry().GetAssets(Filter, result);	
+	}
+
+	return result;
+}
+
+TArray<FAssetData> UFlibAssetParseHelper::GetAssetsByObjectPath(const TArray<FSoftObjectPath>& SoftObjectPaths)
+{
+	TArray<FAssetData> result;
+	UAssetManager& AssetManager = UAssetManager::Get();
+	for(const auto& ObjectPath:SoftObjectPaths)
+	{
+		FAssetData OutAssetData;
+		if (AssetManager.GetAssetDataForPath(ObjectPath, OutAssetData) && OutAssetData.IsValid())
+		{
+			result.AddUnique(OutAssetData);
+		}
+	}
+	return result;
+}
+
+// 属性匹配
+FProperty* UFlibAssetParseHelper::GetPropertyByName(UObject* Obj, const FString& PropertyName)
+{
+	FProperty* Result = nullptr;
+	for(TFieldIterator<FProperty> PropertyIter(Obj->GetClass());PropertyIter;++PropertyIter)
+	{
+		if(PropertyIter->GetName().Equals(PropertyName))
+		{
+			Result = *PropertyIter;
+		}
+		// UE_LOG(LogTemp,Log,TEXT("Property Name: %s"),*PropertyIter->GetName());
+	}
+	return Result;
+}
+
+FString UFlibAssetParseHelper::GetPropertyValueByName(UObject* Obj, const FString& PropertyName)
+{
+	FString Result;
+	FProperty* Property = UFlibAssetParseHelper::GetPropertyByName(Obj, PropertyName);
+	if(Property)
+	{
+		Property->ExportTextItem_Direct(Result,Property->ContainerPtrToValuePtr<void*>(Obj),TEXT(""),NULL,0);
+	}
+	return Result;
+}
+```
+
 ## **其他**
 
 ResScannerUE 提供了Commandlet执行的方法,可以通过指定配置文件的方式启动：
